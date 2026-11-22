@@ -1,30 +1,36 @@
-/* FRONTLINES — service worker (çevrimdışı açılış + otomatik güncelleme)
-   Sürüm: 20261122-2210
-   • index.html  → önce önbellek (anında açılır), arkada yenisini indirir; yenisi gelirse sayfaya haber verir
+/* FRONTLINES — service worker (çevrimdışı açılış + sağlam otomatik güncelleme)
+   Sürüm: 20261123-0005
+   • Kurulum hafif: hiçbir büyük dosya indirmez, anında biter (eskiden 36 MB'lık sayfa kurulumda iniyordu;
+     telefonda yarım kalınca yeni sürüm hiç devreye giremiyordu).
+   • index.html → önce önbellek (anında açılır). Arkada önce küçük bir HEAD isteğiyle "değişti mi?" bakılır;
+     yalnızca değiştiyse tam indirilir. İndirme event.waitUntil ile korunur (tarayıcı yarıda öldürmez);
+     yarım inen dosya önbelleğe yazılmaz, eskisi kalır ve bir sonraki açılışta yeniden denenir.
+   • Sayfa istek üzerine ("check") güncelleme denetler; yenisi inince sayfaya "fl-updated" haberi gider.
    • data.json / auto.json (siteyle gelen kopya) → önce ağ (6 sn), olmazsa son önbellek
-   (asıl güncel veri GitHub veri deposundan sayfa tarafından okunur — bkz. FL_DATA_BASE)
-   • Leaflet / yazı tipleri → önbellekte kalır (çevrimdışı harita kütüphanesi)
-   • Harita karoları, Telegram, Catbox vb. dış istekler → hiç karışılmaz */
-const VER = '20261122-2210';
-const SHELL = 'fl-shell-' + VER;
+     (asıl güncel veri GitHub veri deposundan sayfa tarafından okunur — bkz. FL_DATA_BASE)
+   • Leaflet / yazı tipleri → önbellekte kalır. Harita karoları, Telegram, Catbox vb. dış istekler → karışılmaz */
+const VER = '20261123-0005';
+const APP = 'fl-app';
 const DATA = 'fl-data';
 const LIBS = 'fl-libs-1';
-const PRE = ['./', './data.json', './auto.json', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
+const SMALL = ['./manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 const LIB_HOSTS = ['cdnjs.cloudflare.com', 'fonts.googleapis.com', 'fonts.gstatic.com'];
+const SIGKEY = './__index-sig';
 
 self.addEventListener('install', e => {
+  self.skipWaiting();                                   /* büyük iş yok → kurulum anında biter */
   e.waitUntil((async () => {
-    const c = await caches.open(SHELL);
-    /* tek tek: biri (ör. data.json yoksa) olmasa da kurulum bozulmasın */
-    await Promise.all(PRE.map(u => c.add(new Request(u, { cache: 'no-cache' })).catch(() => {})));
-    await self.skipWaiting();
+    try {
+      const c = await caches.open(APP);
+      await Promise.all(SMALL.map(u => c.add(new Request(u, { cache: 'no-cache' })).catch(() => {})));
+    } catch (err) {}
   })());
 });
 
 self.addEventListener('activate', e => {
   e.waitUntil((async () => {
-    const keep = [SHELL, DATA, LIBS];
-    for (const k of await caches.keys()) if (!keep.includes(k)) await caches.delete(k);
+    const keep = [APP, DATA, LIBS];
+    for (const k of await caches.keys()) if (!keep.includes(k)) await caches.delete(k);   /* eski fl-shell-* önbellekleri */
     await self.clients.claim();
   })());
 });
@@ -33,37 +39,69 @@ async function notify(msg) {
   for (const c of await self.clients.matchAll({ includeUncontrolled: true })) c.postMessage(msg);
 }
 
-function changed(a, b) {
-  if (!a || !b) return true;
-  const ea = a.headers.get('etag'), eb = b.headers.get('etag');
-  if (ea && eb) return ea !== eb;
-  const la = a.headers.get('last-modified'), lb = b.headers.get('last-modified');
-  if (la && lb) return la !== lb;
-  const na = a.headers.get('content-length'), nb = b.headers.get('content-length');
-  return !!(na && nb && na !== nb);
+/* "değişti mi" imzası: etag → last-modified → content-length */
+function sigOf(r) {
+  if (!r) return '';
+  return r.headers.get('etag') || r.headers.get('last-modified') || ('len:' + (r.headers.get('content-length') || ''));
+}
+async function headSig() {
+  try {
+    const r = await fetch(new Request('./', { method: 'HEAD', cache: 'no-cache' }));
+    if (r && r.ok) return sigOf(r);
+  } catch (err) {}
+  return null;                                          /* çevrimdışı ya da HEAD desteklenmiyor */
+}
+async function storedSig(c) {
+  try { const r = await c.match(SIGKEY); return r ? await r.text() : ''; } catch (err) { return ''; }
 }
 
-/* index: önbellek önce, arkada tazele */
-async function shell(req) {
-  const c = await caches.open(SHELL);
-  const hit = await c.match('./', { ignoreSearch: true });
-  const refresh = (async () => {
+/* index'i tazele: 'same' | 'new' | 'fail' — aynı anda yalnızca bir tane */
+let inflight = null;
+function refreshIndex() {
+  if (inflight) return inflight;
+  inflight = (async () => {
     try {
+      const c = await caches.open(APP);
+      const hit = await c.match('./', { ignoreSearch: true });
+      const old = await storedSig(c);
+      const now = await headSig();
+      if (hit && now && old && now === old) return 'same';
       const r = await fetch(new Request('./', { cache: 'no-cache' }));
-      if (r && r.ok) {
-        const diff = changed(hit, r);
-        await c.put('./', r.clone());
-        if (hit && diff) notify({ type: 'fl-updated', what: 'app' });
-      }
-      return r;
-    } catch (err) { return null; }
+      if (!r || !r.ok) return 'fail';
+      const sig = now || sigOf(r);
+      await c.put('./', r.clone());                     /* gövde yarım kalırsa burada hata verir; eski kopya yerinde kalır */
+      await c.put(SIGKEY, new Response(sig));
+      if (hit && old && sig !== old) await notify({ type: 'fl-updated', what: 'app' });
+      return (hit && old && sig === old) ? 'same' : 'new';
+    } catch (err) { return 'fail'; }
+    finally { inflight = null; }
   })();
-  if (hit) return hit;                      /* anında aç; güncelleme arkada sürer */
-  const r = await refresh;                  /* ilk kurulum / önbellek boş */
-  return r || new Response('Offline — open the app once while online first.', { status: 503, headers: { 'content-type': 'text/plain' } });
+  return inflight;
 }
 
-/* data.json: ağ önce */
+/* index: önbellek önce, arkada (korumalı) tazele */
+async function shell(req) {
+  try {
+    const c = await caches.open(APP);
+    const hit = await c.match('./', { ignoreSearch: true });
+    if (hit) return { resp: hit, bg: refreshIndex() };
+    /* önbellek boş (ilk kurulum / sıfırlama): doğrudan ağdan ver, kopyasını arkada sakla */
+    const hp = headSig();
+    const r = await fetch(new Request('./', { cache: 'no-cache' }));
+    let bg = null;
+    if (r && r.ok) {
+      const copy = r.clone();
+      bg = (async () => {
+        try { await c.put('./', copy); await c.put(SIGKEY, new Response((await hp) || sigOf(r))); } catch (err) {}
+      })();
+    }
+    return { resp: r, bg };
+  } catch (err) {
+    return { resp: new Response('Offline — open the app once while online first.', { status: 503, headers: { 'content-type': 'text/plain' } }), bg: null };
+  }
+}
+
+/* data.json / auto.json: ağ önce */
 async function data(req) {
   const c = await caches.open(DATA);
   try {
@@ -73,7 +111,7 @@ async function data(req) {
     if (r && r.ok) { c.put(req, r.clone()); return r; }
     throw new Error('http ' + (r && r.status));
   } catch (err) {
-    const hit = (await c.match(req, { ignoreSearch: true })) || (await (await caches.open(SHELL)).match('./' + (new URL(req.url).pathname.split('/').pop() || 'data.json')));
+    const hit = (await c.match(req, { ignoreSearch: true })) || (await (await caches.open(APP)).match('./' + (new URL(req.url).pathname.split('/').pop() || 'data.json')));
     if (hit) return hit;
     throw err;
   }
@@ -91,7 +129,7 @@ async function lib(req) {
 
 /* diğer aynı-köken dosyalar (ikonlar, manifest): önbellek önce, yoksa ağ */
 async function same(req) {
-  const c = await caches.open(SHELL);
+  const c = await caches.open(APP);
   const hit = await c.match(req, { ignoreSearch: true });
   if (hit) return hit;
   const r = await fetch(req);
@@ -104,11 +142,31 @@ self.addEventListener('fetch', e => {
   if (req.method !== 'GET') return;
   const u = new URL(req.url);
   if (u.origin === self.location.origin) {
-    if (req.mode === 'navigate' && (u.pathname.endsWith('/') || u.pathname.endsWith('/index.html'))) { e.respondWith(shell(req)); return; }
+    if (req.mode === 'navigate' && (u.pathname.endsWith('/') || u.pathname.endsWith('/index.html'))) {
+      const p = shell(req);
+      e.respondWith(p.then(x => x.resp));
+      e.waitUntil(p.then(x => x.bg).catch(() => {}));       /* arka plan indirmesi bitene kadar işçiyi canlı tut */
+      return;
+    }
     if (/\/(data|auto)\.json$/.test(u.pathname)) { e.respondWith(data(req)); return; }
     if (/\/(sw\.js)$/.test(u.pathname)) return;                  /* SW'nin kendisine dokunma */
     if (/\.(png|svg|webmanifest|ico)$/.test(u.pathname)) { e.respondWith(same(req)); return; }
     return;
   }
   if (LIB_HOSTS.includes(u.hostname)) e.respondWith(lib(req));
+});
+
+/* sayfadan gelen istekler: 'ver' (sürüm sor) · 'check' (güncelleme denetle) */
+self.addEventListener('message', e => {
+  const d = e.data || {};
+  const reply = m => { try { if (e.source) e.source.postMessage(m); } catch (err) {} };
+  if (d.type === 'ver') {
+    e.waitUntil((async () => {
+      let cached = false, sig = '';
+      try { const c = await caches.open(APP); cached = !!(await c.match('./', { ignoreSearch: true })); sig = await storedSig(c); } catch (err) {}
+      reply({ type: 'fl-ver', ver: VER, cached, sig });
+    })());
+  } else if (d.type === 'check') {
+    e.waitUntil((async () => { const res = await refreshIndex(); reply({ type: 'fl-check', result: res, ver: VER }); })());
+  }
 });

@@ -2657,6 +2657,7 @@
     pointer-events:none;
   }
   #admin-toast.on{ opacity:1;transform:translateY(0); }
+  #admin-toast.tap{ pointer-events:auto;cursor:pointer;background:#3ea6ff;color:#04121f; }
 
   body.admin-pick [data-edit],
   body.admin-pick [data-img]{ cursor:crosshair; }
@@ -2987,6 +2988,8 @@
   .fpub-status.err{ color:#e0685a; }
   .fpub-row{ display:flex;gap:8px;flex-wrap:wrap;margin-top:10px; }
   .fpub-row .ed-btn{ padding:10px 14px; }
+  .fpub-app{ border-top:1px solid #1d262d;margin-top:14px;padding-top:10px; }
+  .fpub-appv{ font-size:10px;line-height:1.6;color:#7d8a94;word-break:break-all;margin-bottom:6px; }
 
   .ed-body{ flex:1;display:flex;overflow:hidden; }
   .ed-form{ width:430px;overflow-y:auto;padding:16px;border-right:1px solid #1e262c; }
@@ -9257,6 +9260,15 @@ function fpubOpen(){
           <button class="ed-btn" id="fpub-save">SAVE</button>
           <button class="ed-btn" id="fpub-close">CLOSE</button>
         </div>
+        <div class="fpub-app">
+          <div class="fpub-appv" id="fpub-appv"></div>
+          <div class="fpub-row">
+            <button class="ed-btn" id="fpub-chk">CHECK FOR UPDATE</button>
+            <button class="ed-btn" id="fpub-rel" style="display:none">RELOAD NOW</button>
+            <button class="ed-btn" id="fpub-rst">RESET APP COPY</button>
+          </div>
+          <div class="fpub-p" style="margin:8px 0 0">Reset removes only the stored copy of the app and re-downloads it (about 36 MB). Your content and settings are not touched.</div>
+        </div>
       </div>`;
     document.body.appendChild(ov);
     const q = id=> document.getElementById(id);
@@ -9291,7 +9303,32 @@ function fpubOpen(){
       if(r.ok){ refresh(); say('✓ Published (' + Math.round(r.bytes / 1024) + ' KB). Other devices see it the next time they open the app (GitHub may take up to 5 minutes).\n' + q('fpub-status').textContent, 'ok'); try { toast('Published to GitHub'); } catch(e){} }
       else say('✕ ' + r.error, 'err');
     });
-    ov._refresh = refresh;
+    /* --- APP: sürüm + güncelleme denetimi + uygulama kopyasını sıfırla --- */
+    const appInfo = async ()=>{
+      const A = window.FLApp; const el = q('fpub-appv'); if(!A){ el.textContent = ''; return; }
+      el.textContent = 'APP BUILD ' + A.build + (A.live ? ' · checking service worker…' : ' · offline copy (no auto-update)');
+      if(!A.live) return;
+      const v = await A.swVersion();
+      el.textContent = 'APP BUILD ' + A.build + (v ? ' · service worker ' + v.ver + (v.cached ? ' · app copy stored' : ' · app copy NOT stored yet') : ' · service worker: not controlling this page yet');
+    };
+    q('fpub-chk').addEventListener('click', async ()=>{
+      const A = window.FLApp; if(!A) return;
+      const b = q('fpub-chk'); b.disabled = true; say('Checking for a new version… (a new download can take a minute or two)');
+      const r = await A.check(); b.disabled = false; appInfo();
+      if(!r) say('✕ Could not reach the update service. Close and reopen the app, or use RESET APP COPY.', 'err');
+      else if(r.result === 'same') say('✓ You are on the latest version.', 'ok');
+      else if(r.result === 'new'){ say('✓ A new version was downloaded. Tap RELOAD NOW.', 'ok'); q('fpub-rel').style.display = ''; }
+      else say('✕ The check failed (no connection or the download was cut). Try again on Wi‑Fi.', 'err');
+    });
+    q('fpub-rel').addEventListener('click', ()=> location.reload());
+    let rstT = 0;
+    q('fpub-rst').addEventListener('click', async ()=>{
+      const A = window.FLApp; if(!A) return; const b = q('fpub-rst');
+      if(!rstT){ b.textContent = 'TAP AGAIN TO CONFIRM'; rstT = setTimeout(()=>{ rstT = 0; b.textContent = 'RESET APP COPY'; }, 6000); return; }
+      clearTimeout(rstT); rstT = 0; b.disabled = true; say('Resetting… the page will reload and download the app again.');
+      await A.reset(); setTimeout(()=> location.reload(), 400);
+    });
+    ov._refresh = ()=>{ refresh(); appInfo(); };
   }
   ov._refresh(); ov.classList.add('on');
 }
@@ -26350,27 +26387,64 @@ function fsClose(){
 
 </script>
 <script>
-/* PWA-v1: servis işçisi — yalnızca http(s) üzerinde (file:// ve DOWNLOAD SITE kopyasında devre dışı) */
+/* PWA-v2: servis işçisi — yalnızca http(s) üzerinde (file:// ve DOWNLOAD SITE kopyasında devre dışı) */
 (function(){
-  if(!('serviceWorker' in navigator) || !/^https?:$/.test(location.protocol)) return;
+  var BUILD = '20261123-0005';
+  var live = ('serviceWorker' in navigator) && /^https?:$/.test(location.protocol);
+  var reg = null, lastKick = 0;
+  function ctl(){ return live ? navigator.serviceWorker.controller : null; }
+  function post(m){ var c = ctl(); if(!c) return false; try { c.postMessage(m); return true; } catch(_){ return false; } }
+  function ask(m, type, ms){
+    return new Promise(function(res){
+      if(!live || !post(m)){ res(null); return; }
+      var done = false, h = function(e){ if(e.data && e.data.type === type){ done = true; navigator.serviceWorker.removeEventListener('message', h); res(e.data); } };
+      navigator.serviceWorker.addEventListener('message', h);
+      setTimeout(function(){ if(!done){ navigator.serviceWorker.removeEventListener('message', h); res(null); } }, ms || 5000);
+    });
+  }
+  function kick(){                                  /* en fazla 20 dakikada bir: SW dosyasını ve index'i denetle */
+    var now = Date.now(); if(now - lastKick < 20*60*1000) return; lastKick = now;
+    try { if(reg) reg.update(); } catch(_){}
+    post({ type:'check' });
+  }
+  /* DIŞARIYA: PUBLISH panelindeki "APP" bölümü bunu kullanır */
+  window.FLApp = {
+    build: BUILD,
+    live: live,
+    swVersion: function(){ return ask({ type:'ver' }, 'fl-ver', 4000); },
+    check: function(){ return ask({ type:'check' }, 'fl-check', 240000); },
+    reset: async function(){                        /* yalnızca uygulama kopyası + işçi; kayıtların (localStorage) dokunulmaz */
+      try { if(live){ var rs = await navigator.serviceWorker.getRegistrations(); for(var i=0;i<rs.length;i++) await rs[i].unregister(); } } catch(_){}
+      try { var ks = await caches.keys(); for(var j=0;j<ks.length;j++) await caches.delete(ks[j]); } catch(_){}
+      return true;
+    },
+    tapToReload: function(msg){
+      try {
+        var t = document.getElementById('admin-toast'); if(!t) return;
+        t.textContent = msg || 'New version ready — TAP HERE to reload'; t.classList.add('on', 'tap');
+        t.onclick = function(){ location.reload(); };
+        clearTimeout(t._h); t._h = setTimeout(function(){ t.classList.remove('on', 'tap'); t.onclick = null; }, 20000);
+      } catch(_){}
+    }
+  };
+  if(!live) return;
   window.addEventListener('load', function(){
-    navigator.serviceWorker.register('sw.js', { scope:'./' }).catch(function(e){ console.info('[FL] sw kaydı yok:', e && e.message); });
+    navigator.serviceWorker.register('sw.js', { scope:'./', updateViaCache:'none' }).then(function(r){ reg = r; }).catch(function(e){ console.info('[FL] sw kaydı yok:', e && e.message); });
+    setTimeout(kick, 15000);                         /* sayfa yüklemesiyle yarışmasın */
     /* tarayıcıdan "bu sitenin hafızasını (kayıtlarım) silme" iste — tarayıcı yer açarken önce silinmesin */
     try { if(navigator.storage && navigator.storage.persist) navigator.storage.persist().then(function(ok){ console.info('[FL] kalıcı depolama:', ok); }); } catch(_){}
   });
+  /* yüklü uygulama arka plandan geri gelince (yeniden başlatılmaz) de denetle */
+  document.addEventListener('visibilitychange', function(){ if(document.visibilityState === 'visible') kick(); });
+  navigator.serviceWorker.addEventListener('controllerchange', function(){ setTimeout(kick, 20000); });
   navigator.serviceWorker.addEventListener('message', function(e){
     if(e.data && e.data.type === 'fl-updated'){
       /* "Data updated" iletisi bitince göster (ikisi aynı kutuyu kullanır) */
-      setTimeout(function(){
-        try {
-          var t = document.getElementById('admin-toast');
-          if(t){ t.textContent = 'New version downloaded — close and reopen the app to use it'; t.classList.add('on'); clearTimeout(t._h); t._h = setTimeout(function(){ t.classList.remove('on'); }, 8000); }
-        } catch(_){}
-      }, 2500);
+      setTimeout(function(){ window.FLApp.tapToReload('New version downloaded — TAP HERE to reload'); }, 2500);
     }
   });
 })();
-/* /PWA-v1 */
+/* /PWA-v2 */
 </script>
 </body>
 </html>
