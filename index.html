@@ -2,6 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<!-- NOREF-v1: sayfanın yaptığı hiçbir istek Referer göndermesin (X videoları başka sitenin Referer'ını reddediyor; yerel dosyada Referer olmadığı için oynuyordu) -->
+<meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0a0b0e">
 <!-- PWA: telefonda "Ana ekrana ekle" ile uygulama gibi açılır (sw.js + manifest.webmanifest siteyle aynı klasörde olmalı) -->
@@ -26588,7 +26590,7 @@ function fsClose(){
 <script>
 /* PWA-v2: servis işçisi — yalnızca http(s) üzerinde (file:// ve DOWNLOAD SITE kopyasında devre dışı) */
 (function(){
-  var BUILD = '20261123-0140';
+  var BUILD = '20261123-0215';
   var live = ('serviceWorker' in navigator) && /^https?:$/.test(location.protocol);
   var reg = null, lastKick = 0;
   function ctl(){ return live ? navigator.serviceWorker.controller : null; }
