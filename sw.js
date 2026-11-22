@@ -1,14 +1,15 @@
 /* FRONTLINES — service worker (çevrimdışı açılış + otomatik güncelleme)
-   Sürüm: 20261122-1814
+   Sürüm: 20261122-2210
    • index.html  → önce önbellek (anında açılır), arkada yenisini indirir; yenisi gelirse sayfaya haber verir
-   • data.json   → önce ağ (6 sn), olmazsa son önbellek: içerik her açılışta tazelenir
+   • data.json / auto.json (siteyle gelen kopya) → önce ağ (6 sn), olmazsa son önbellek
+   (asıl güncel veri GitHub veri deposundan sayfa tarafından okunur — bkz. FL_DATA_BASE)
    • Leaflet / yazı tipleri → önbellekte kalır (çevrimdışı harita kütüphanesi)
    • Harita karoları, Telegram, Catbox vb. dış istekler → hiç karışılmaz */
-const VER = '20261122-1814';
+const VER = '20261122-2210';
 const SHELL = 'fl-shell-' + VER;
 const DATA = 'fl-data';
 const LIBS = 'fl-libs-1';
-const PRE = ['./', './data.json', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
+const PRE = ['./', './data.json', './auto.json', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 const LIB_HOSTS = ['cdnjs.cloudflare.com', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 
 self.addEventListener('install', e => {
@@ -72,7 +73,7 @@ async function data(req) {
     if (r && r.ok) { c.put(req, r.clone()); return r; }
     throw new Error('http ' + (r && r.status));
   } catch (err) {
-    const hit = (await c.match(req, { ignoreSearch: true })) || (await (await caches.open(SHELL)).match('./data.json'));
+    const hit = (await c.match(req, { ignoreSearch: true })) || (await (await caches.open(SHELL)).match('./' + (new URL(req.url).pathname.split('/').pop() || 'data.json')));
     if (hit) return hit;
     throw err;
   }
@@ -104,7 +105,7 @@ self.addEventListener('fetch', e => {
   const u = new URL(req.url);
   if (u.origin === self.location.origin) {
     if (req.mode === 'navigate' && (u.pathname.endsWith('/') || u.pathname.endsWith('/index.html'))) { e.respondWith(shell(req)); return; }
-    if (/\/data\.json$/.test(u.pathname)) { e.respondWith(data(req)); return; }
+    if (/\/(data|auto)\.json$/.test(u.pathname)) { e.respondWith(data(req)); return; }
     if (/\/(sw\.js)$/.test(u.pathname)) return;                  /* SW'nin kendisine dokunma */
     if (/\.(png|svg|webmanifest|ico)$/.test(u.pathname)) { e.respondWith(same(req)); return; }
     return;

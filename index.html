@@ -2971,6 +2971,23 @@
   .ed-btn.go{ background:#3ea6ff;color:#04121e;border-color:#3ea6ff; }
   .ed-btn.danger:hover{ background:#c0392b;color:#fff;border-color:#c0392b; }
 
+  /* ---- PUBLISH paneli ---- */
+  .fpub-ov{ position:fixed;inset:0;z-index:4300;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.74);padding:14px; }
+  .fpub-ov.on{ display:flex; }
+  .fpub-box{ width:min(540px,100%);max-height:94vh;overflow:auto;background:#07090c;border:1px solid #2a343b;border-top:3px solid #3ea6ff;padding:16px;font-family:'IBM Plex Mono',monospace;color:#cfd6db; }
+  .fpub-box h3{ margin:0 0 8px;font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:#3ea6ff;font-weight:normal; }
+  .fpub-p{ font-size:10.5px;line-height:1.65;color:#8d9aa4;margin:0 0 10px; }
+  .fpub-p b{ color:#cfd6db;font-weight:normal; }
+  .fpub-box details{ margin:0 0 10px; }
+  .fpub-box details summary{ cursor:pointer;font-size:10px;color:#7d8a94;margin-bottom:6px; }
+  .fpub-opt{ display:flex;gap:8px;align-items:flex-start;font-size:10.5px;line-height:1.55;color:#b7c1c8;margin:8px 0; }
+  .fpub-opt input{ margin-top:2px;flex:none; }
+  .fpub-status{ font-size:10.5px;line-height:1.65;min-height:18px;margin:8px 0;color:#9aa8b2;white-space:pre-wrap; }
+  .fpub-status.ok{ color:#58c27d; }
+  .fpub-status.err{ color:#e0685a; }
+  .fpub-row{ display:flex;gap:8px;flex-wrap:wrap;margin-top:10px; }
+  .fpub-row .ed-btn{ padding:10px 14px; }
+
   .ed-body{ flex:1;display:flex;overflow:hidden; }
   .ed-form{ width:430px;overflow-y:auto;padding:16px;border-right:1px solid #1e262c; }
   .ed-list{ flex:1;overflow-y:auto;padding:16px; }
@@ -5070,15 +5087,15 @@
     </div>
     <div class="lv-grid" id="lv-grid"></div>
     <div class="lv-footnote">
-      <b>SOURCE.</b> Ukraine's Armed Forces General Staff daily briefing (15.11.2026),
-      via Ukrinform, Ukrmedia and Ukrainska Pravda (identical); the daily changes were also reconciled
-      against the Ukrainian MoD tables of 13 and 14 November, which add up to the same totals.
+      <b>SOURCE.</b> Ukraine's Armed Forces General Staff daily briefing (<span id="lv-src-date">15.11.2026</span>),
+      <span id="lv-src-via">via Ukrinform, Ukrmedia and Ukrainska Pravda (identical); the daily changes were also reconciled
+      against the Ukrainian MoD tables of 13 and 14 November, which add up to the same totals.</span>
       The figures are <b>Ukrainian government estimates</b> and
       have not been independently verified; Russia does not disclose its own losses.
       <br><br>
       <b>⚠ SOURCE DISCREPANCY.</b> The personnel figure can diverge between sources by a day's lag:
       Ukrinform sometimes publishes the previous day's total. The General Staff's
-      15 November bulletin (1,622,860) is used here.
+      <span id="lv-src-bull">15 November bulletin (1,622,860)</span> is used here.
       <br><br>
       <b>CONTEXT.</b> In October 2026 Russian personnel losses reached <b>54,400</b> per the General Staff —
       the highest monthly figure since the full-scale invasion began (the previous peak was 48,670 in
@@ -5445,6 +5462,7 @@
     <span class="ed-storage" id="ed-storage"></span>
     <button class="ed-btn go" id="ed-savefile">DOWNLOAD SITE</button>
     <button class="ed-btn" id="ed-export">BACK UP CONTENT</button>
+    <button class="ed-btn go" id="ed-publish" title="Send your edits to GitHub so every device shows them">PUBLISH</button>
     <button class="ed-btn" id="ed-exportdata" title="Generate data.json so it shows on all devices">EXPORT DATA</button>
     <button class="ed-btn" id="ed-import">IMPORT</button>
     <input type="file" id="ed-import-file" accept=".json" hidden>
@@ -7729,7 +7747,17 @@ const FUnit = (function(){
   }
   function locData(){
     const st = loadStored();
-    return st ? { snap: st.snap, pos: st.pos, custom: true } : { snap: UA_UNIT_POS.snap, pos: UA_UNIT_POS.pos, custom: false };
+    if(st && !(UA_UNIT_POS.snap && String(UA_UNIT_POS.snap) > String(st.snap))) return { snap: st.snap, pos: st.pos, custom: true };
+    return { snap: UA_UNIT_POS.snap, pos: UA_UNIT_POS.pos, custom: false };
+  }
+  /* AUTO-v1: auto.json'dan gelen günlük konumlar gömülü konumların yerine geçer */
+  function applyAuto(u){
+    if(!u || !u.pos || typeof u.pos !== 'object' || !Object.keys(u.pos).length) return false;
+    if(u.names && typeof u.names === 'object') Object.keys(u.names).forEach(id=>{ if(!UA_UNIT_NAMES[id]) UA_UNIT_NAMES[id] = String(u.names[id] || '').trim(); });
+    UA_UNIT_POS.snap = String(u.snap || UA_UNIT_POS.snap);
+    UA_UNIT_POS.pos = u.pos;
+    IDX = null;
+    return true;
   }
 
   /* ---------------- coğrafya ---------------- */
@@ -7946,7 +7974,7 @@ const FUnit = (function(){
   function index(){
     const L = locData();
     const evN = (typeof EVENTS !== 'undefined' && Array.isArray(EVENTS)) ? EVENTS.length : 0;
-    const sig = (L.custom ? L.snap : 'builtin') + ':' + Object.keys(L.pos).length + ':' + Object.keys(UA_UNIT_NAMES).length + ':' + evN;
+    const sig = (L.custom ? L.snap : 'builtin' + L.snap) + ':' + Object.keys(L.pos).length + ':' + Object.keys(UA_UNIT_NAMES).length + ':' + evN;
     if(IDX && sig === IDX_SIG) return IDX;
     const ents = [];
     Object.keys(UA_UNIT_NAMES).forEach(id=>{
@@ -8556,7 +8584,7 @@ const FUnit = (function(){
   function reset(){ flkSet(K_LOC, null); IDX = null; }
   function info(){ const L = locData(); return { snap:L.snap, count:Object.keys(L.pos).length, custom:L.custom }; }
 
-  return { detect, mentions, locate, frontAt, anchors, parseName, ageDays, ingest, reset, info, index, urlHandle, byHandle, handleText, norm, atSea, MAX_AGE_DAYS };
+  return { detect, mentions, locate, frontAt, anchors, parseName, ageDays, ingest, reset, info, applyAuto, index, urlHandle, byHandle, handleText, norm, atSea, MAX_AGE_DAYS };
 })();
 
 /* =====================================================================
@@ -8989,29 +9017,285 @@ function flApplyRemote(data){
   if(did.events){ ['fitFrontsToEvents','rebuildEventMarkers','renderFeed','calRender'].forEach(run); }
   if(did.ambargo){ run('renderAmbList'); }
   if(did.desk){ ['renderDeskFilters','renderDeskFeed'].forEach(run); }
-  if(did.losses){ run('renderLosses'); }
+  if(did.losses){ ['renderLossesGrid','applyLossesBanner'].forEach(run); }
   return true;
 }
 
-function flLoadRemote(){
-  const url = flRemoteUrl();
-  if(!url) return;
-  if(location.protocol === 'file:') return;   /* yerel dosyada anlamsız */
+/* AUTO-v1: veri artık sitenin dışında, küçük bir GitHub veri deposunda durur (FL_DATA_BASE).
+   Neden: Netlify ücretsiz planda her site yayını 15 kredi harcar (ayda 300). Günlük veri güncellemesi
+   siteyi yeniden yayınlatmasın diye data.json (editör içeriği) ve auto.json (günlük otomatik katmanlar)
+   bu depodan okunur. Depo okunamazsa: son indirilen kopya → siteyle gelen kopya (./data.json, ./auto.json). */
+const FL_DATA_BASE = 'https://raw.githubusercontent.com/holamaamor/frontlineq-data/main/';
+const FL_DATA_BASE_KEY = 'flDataBase';
+function flDataBase(){
+  try { const v = localStorage.getItem(FL_DATA_BASE_KEY); if(v !== null) return v; } catch(e){}
+  return FL_DATA_BASE;                       /* '' (boş) → yalnızca siteyle gelen kopya */
+}
+function flCacheRemote(name, text){
+  try {
+    if(!window.caches) return;
+    caches.open('fl-data').then(c=> c.put(new Request('./__remote/' + name), new Response(text, { headers:{ 'content-type':'application/json' } }))).catch(()=>{});
+  } catch(e){}
+}
+function flCachedRemote(name){
+  try {
+    if(!window.caches) return Promise.resolve(null);
+    return caches.open('fl-data').then(c=> c.match('./__remote/' + name)).then(r=> r ? r.json() : null).catch(()=> null);
+  } catch(e){ return Promise.resolve(null); }
+}
+function flFetchJson(name){
+  const base = flDataBase();
+  const get = (url, ext)=> fetch(url, { cache: ext ? 'no-cache' : 'no-store' })
+    .then(r=> r.ok ? r.text() : Promise.reject(new Error('HTTP ' + r.status)))
+    .then(t=>{ const d = JSON.parse(t); if(ext) flCacheRemote(name, t); return d; });
+  let p = base ? get(base + name, true) : Promise.reject(new Error('no remote base'));
+  p = p.catch(()=> flCachedRemote(name).then(d=> d || Promise.reject(new Error('no cached copy'))));
+  return p.catch(()=> get('./' + name, false));
+}
 
-  fetch(url, { cache:'no-store' })
-    .then(r=> r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
-    .then(d=>{
-      if(flApplyRemote(d)){
-        const n = (d.events||[]).length;
-        console.info('[FL] uzak veri yüklendi: ' + n + ' olay · ' + (d.updated || url));
-        if(typeof toast === 'function' && d.updated) toast('Data updated · ' + d.updated);
-      }
+/* auto.json: { updated, deepstate:{date, zones}, ua:{snap, pos, names}, losses:{date, dateLabel, items:[{label,value,delta}], via, bulletin} } */
+function flApplyAuto(a){
+  if(!a || typeof a !== 'object') return false;
+  const did = [];
+  try {
+    const ds = a.deepstate;
+    if(ds && ds.zones && Array.isArray(ds.zones.features) && ds.zones.features.length){
+      DEEPSTATE_ZONES.features = ds.zones.features;
+      try { if(typeof deepstateZonesLayer !== 'undefined' && deepstateZonesLayer){ deepstateZonesLayer.clearLayers(); deepstateZonesLayer.addData(DEEPSTATE_ZONES); } } catch(e){ /* katman henüz kurulmadı: kurulunca güncel veriyi alır */ }
+      try { const l = document.getElementById('dsm-link'); if(l && ds.date) l.title = 'DeepStateMap.live — live front-line control-zone map (layer as of ' + ds.date + '; opens in a new tab)'; } catch(e){}
+      did.push('deepstate');
+    }
+  } catch(e){ console.warn('[FL] auto deepstate', e); }
+  try {
+    const u = a.ua;
+    if(u && u.pos && typeof u.pos === 'object' && Object.keys(u.pos).length && typeof FUnit !== 'undefined' && FUnit.applyAuto){
+      if(FUnit.applyAuto(u)){ did.push('units'); try { window.dispatchEvent(new Event('fl-unit-pos')); } catch(e){} }
+    }
+  } catch(e){ console.warn('[FL] auto units', e); }
+  try {
+    const l = a.losses;
+    if(l && Array.isArray(l.items) && l.items.length){
+      l.items.forEach(it=>{
+        const t = LOSSES_DATA.find(x=> x.label === it.label);
+        if(t){ t.value = it.value; t.delta = it.delta; }
+      });
+      let fresh = true;
+      try {
+        if(FL_USER.autoLossDate !== l.date){            /* yeni günlük rakam, eski elle düzeltmelerin yerini alır */
+          if(Array.isArray(FL_USER.losses)) FL_USER.losses = FL_USER.losses.filter(o=> !l.items.some(x=> x.label === o.label));
+          FL_USER.autoLossDate = l.date;
+          localStorage.setItem(FL_STORE, JSON.stringify(FL_USER));
+        } else fresh = false;
+        if(!fresh && Array.isArray(FL_USER.losses)) FL_USER.losses.forEach(o=>{    /* aynı gün: bu cihazdaki düzeltmeler geçerli */
+          const t = LOSSES_DATA.find(x=> x.label === o.label); if(t) Object.assign(t, o);
+        });
+      } catch(e){}
+      const set = (id, txt)=>{ const el = document.getElementById(id); if(el && txt) el.textContent = txt; };
+      set('lv-dates', l.dateLabel ? '24 FEB 2022 — ' + l.dateLabel : '');
+      set('lv-src-date', l.srcDate);
+      set('lv-src-via', l.via);
+      set('lv-src-bull', l.bulletin);
+      ['renderLossesGrid', 'applyLossesBanner'].forEach(fn=>{ try { if(typeof window[fn] === 'function') window[fn](); } catch(e){ console.warn('[FL] ' + fn, e); } });
+      did.push('losses');
+    }
+  } catch(e){ console.warn('[FL] auto losses', e); }
+  if(did.length) console.info('[FL] auto.json uygulandı: ' + did.join(', ') + ' · ' + (a.updated || ''));
+  return did.length > 0;
+}
+
+function flLoadRemote(){
+  if(location.protocol === 'file:'){ window.__flRemoteDone = true; return; }   /* yerel dosyada anlamsız */
+  let custom = null;
+  try { custom = localStorage.getItem(FL_REMOTE_KEY); } catch(e){}
+  const dataP = custom
+    ? fetch(custom, { cache:'no-store' }).then(r=> r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))
+    : flFetchJson('data.json');
+  const autoP = custom ? Promise.reject(new Error('custom data url')) : flFetchJson('auto.json');
+  Promise.all([ dataP.catch(err=>{ console.info('[FL] uzak veri yok veya okunamadı:', err.message); return null; }),
+                autoP.catch(err=>{ console.info('[FL] auto.json yok veya okunamadı:', err.message); return null; }) ])
+    .then(([d, a])=>{
+      try {
+        if(d && flApplyRemote(d)){
+          const n = (d.events||[]).length;
+          console.info('[FL] uzak veri yüklendi: ' + n + ' olay · ' + (d.updated || ''));
+          if(typeof toast === 'function' && d.updated) toast('Data updated · ' + d.updated);
+        }
+      } catch(e){ console.warn('[FL] data.json uygulanamadı', e); }
+      try { if(a) flApplyAuto(a); } catch(e){ console.warn('[FL] auto.json uygulanamadı', e); }
     })
-    .catch(err=> console.info('[FL] uzak veri yok veya okunamadı (' + url + '):', err.message));
+    .then(()=>{ window.__flRemoteDone = true; });
 }
 
 /* Harita kütüphanesi yüklenemese bile senkron çalışsın diye burada başlatılır. */
 try { flLoadRemote(); } catch(e){ console.warn('[FL] uzak veri başlatılamadı:', e); }
+
+/* PUBLISH-v1: editör içeriğini (data.json) GitHub veri deposuna yazar → her cihaz görür.
+   • Anahtar (token) yalnızca bu tarayıcının localStorage'ında durur; hiçbir yere gönderilmez, günlüğe yazılmaz.
+   • Netlify'a dokunmaz: veri ayrı depodadır, bu yüzden site yayını (kredi) harcanmaz.
+   • Otomatik: uygulama açıkken, son yayından 24 saat geçmişse ve değişiklik varsa kendiliğinden yayınlar. */
+const FPub = (()=>{
+  const K = 'flPub';
+  const DEF = { repo:'holamaamor/frontlineq-data', branch:'main', path:'data.json', auto:true, token:'', lastT:0, lastHash:'', lastMsg:'' };
+  const DAY = 24 * 3600 * 1000, MAX_BYTES = 40 * 1024 * 1024;
+  let busy = false;
+  function load(){ try { return Object.assign({}, DEF, JSON.parse(localStorage.getItem(K) || '{}')); } catch(e){ return Object.assign({}, DEF); } }
+  function save(c){ try { localStorage.setItem(K, JSON.stringify(c)); return true; } catch(e){ return false; } }
+  function set(p){ const c = load(); Object.assign(c, p); save(c); return c; }
+  function hasToken(){ return !!load().token; }
+  function stamp(){ const d = new Date(), p = n=> String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()); }
+  function payload(){
+    return { updated: stamp(),
+             events:  (typeof EVENTS !== 'undefined') ? EVENTS : [],
+             ambargo: (typeof AMBARGO_DATA !== 'undefined') ? AMBARGO_DATA : [],
+             desk:    (typeof DESK_FEED !== 'undefined') ? DESK_FEED : [],
+             losses:  (typeof LOSSES_DATA !== 'undefined') ? LOSSES_DATA : [] };
+  }
+  function userHash(){ try { const o = Object.assign({}, FL_USER); delete o.rseen; delete o.autoLossDate; return flH(JSON.stringify(o)); } catch(e){ return ''; } }
+  function hasContent(){ try { return Object.keys(FL_USER).some(k=> k !== 'rseen' && k !== 'autoLossDate' && ((Array.isArray(FL_USER[k]) && FL_USER[k].length) || FL_USER[k] === true)); } catch(e){ return false; } }
+  function dirty(){ const c = load(); return c.lastHash ? userHash() !== c.lastHash : hasContent(); }
+  function toB64(str){
+    const bytes = new TextEncoder().encode(str); let bin = ''; const CH = 0x8000;
+    for(let i = 0; i < bytes.length; i += CH) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+    return btoa(bin);
+  }
+  async function api(method, url, token, body){
+    const r = await fetch(url, { method, headers: Object.assign({ 'Authorization':'Bearer ' + token, 'Accept':'application/vnd.github+json', 'X-GitHub-Api-Version':'2022-11-28' }, body ? { 'Content-Type':'application/json' } : {}),
+                                 body: body ? JSON.stringify(body) : undefined });
+    let j = null; try { j = await r.json(); } catch(e){}
+    return { ok:r.ok, status:r.status, json:j };
+  }
+  function explain(r){
+    const m = (r.json && r.json.message) ? ' (' + String(r.json.message).slice(0, 120) + ')' : '';
+    if(r.status === 401) return 'GitHub rejected the token — it is wrong or expired. Make a new one.' + m;
+    if(r.status === 403) return 'The token has no permission here — it needs "Contents: Read and write" on this repository.' + m;
+    if(r.status === 404) return 'Repository, branch or file not found — or the token cannot see this repository.' + m;
+    if(r.status === 409 || r.status === 422) return 'GitHub says the file changed meanwhile — try again.' + m;
+    return 'GitHub error ' + r.status + m;
+  }
+  function endpoint(c){ return 'https://api.github.com/repos/' + c.repo.replace(/^\/+|\/+$/g, '') + '/contents/' + c.path.split('/').map(encodeURIComponent).join('/'); }
+  async function test(){
+    const c = load();
+    if(!c.token) return { ok:false, error:'Paste your GitHub token first.' };
+    try {
+      const r = await api('GET', 'https://api.github.com/repos/' + c.repo.replace(/^\/+|\/+$/g, ''), c.token);
+      if(!r.ok) return { ok:false, error: explain(r) };
+      if(r.json && r.json.permissions && r.json.permissions.push === false) return { ok:false, error:'The token can read ' + c.repo + ' but not write — it needs "Contents: Read and write".' };
+      return { ok:true, repo: r.json && r.json.full_name, isPrivate: !!(r.json && r.json.private) };
+    } catch(e){ return { ok:false, error:'Could not reach GitHub — check the connection.' }; }
+  }
+  async function publish(opts){
+    if(busy) return { ok:false, error:'A publish is already running.' };
+    const c = load();
+    if(!c.token) return { ok:false, error:'Paste your GitHub token first.' };
+    if(!c.repo || !c.path) return { ok:false, error:'Repository / file path is empty.' };
+    busy = true;
+    try {
+      const text = JSON.stringify(payload());
+      if(text.length > MAX_BYTES) return { ok:false, error:'data.json would be ' + Math.round(text.length / 1048576) + ' MB — too large. Photos/videos uploaded by hand are embedded; host them (Catbox) instead.' };
+      const url = endpoint(c), msg = 'Update ' + c.path + ' — editor publish ' + stamp() + (opts && opts.auto ? ' (auto)' : '');
+      let last = null;
+      for(let attempt = 0; attempt < 3; attempt++){
+        const g = await api('GET', url + '?ref=' + encodeURIComponent(c.branch), c.token);
+        let sha = null;
+        if(g.ok && g.json && g.json.sha) sha = g.json.sha;
+        else if(g.status !== 404) return { ok:false, error: explain(g) };
+        const body = { message: msg, content: toB64(text), branch: c.branch };
+        if(sha) body.sha = sha;
+        const p = await api('PUT', url, c.token, body);
+        if(p.ok){
+          set({ lastT: Date.now(), lastHash: userHash(), lastMsg: stamp() });
+          return { ok:true, bytes:text.length, commit: p.json && p.json.commit && p.json.commit.sha };
+        }
+        last = p;
+        if(p.status !== 409 && p.status !== 422) break;
+      }
+      return { ok:false, error: explain(last) };
+    } catch(e){
+      return { ok:false, error:'Could not reach GitHub — check the connection (' + ((e && e.message) || e) + ').' };
+    } finally { busy = false; }
+  }
+  function autoTick(){
+    try {
+      const c = load();
+      if(!c.auto || !c.token || busy) return;
+      if(navigator.onLine === false) return;
+      if(!dirty()) return;
+      if(Date.now() - (c.lastT || 0) < DAY) return;
+      publish({ auto:true }).then(r=>{ try { if(typeof toast === 'function') toast(r.ok ? 'Published to GitHub (daily auto-publish)' : 'Auto-publish failed — ' + r.error); } catch(e){} });
+    } catch(e){}
+  }
+  function startAuto(){
+    let tries = 0;
+    const wait = ()=>{ if(window.__flRemoteDone || ++tries > 25){ autoTick(); setInterval(autoTick, 30 * 60 * 1000); } else setTimeout(wait, 1000); };
+    setTimeout(wait, 8000);
+  }
+  startAuto();
+  return { load, set, hasToken, dirty, publish, test, userHash, endpoint, _t:{ toB64, payload } };
+})();
+
+/* PUBLISH paneli (editörden açılır) */
+function fpubOpen(){
+  let ov = document.getElementById('fpub');
+  if(!ov){
+    ov = document.createElement('div'); ov.id = 'fpub'; ov.className = 'fpub-ov';
+    ov.innerHTML = `
+      <div class="fpub-box" role="dialog" aria-label="Publish to all devices">
+        <h3>PUBLISH TO ALL DEVICES</h3>
+        <p class="fpub-p">Sends the content you edited here (events, desk, ambargo, counters) to your GitHub data repository as <b>data.json</b>. Every device that opens the site then shows it. The site itself is not re-published, so Netlify credits are not used.</p>
+        <div class="ed-f"><label>GITHUB TOKEN — stays in this browser only</label>
+          <input type="password" id="fpub-token" autocomplete="off" spellcheck="false">
+          <div class="ed-hint" id="fpub-tokhint"></div></div>
+        <details><summary>How do I get a token?</summary>
+          <p class="fpub-p">github.com → your photo → Settings → Developer settings → Personal access tokens → <b>Fine-grained tokens</b> → Generate new token. Repository access: <b>Only select repositories</b> → your data repo. Permissions → Repository permissions → <b>Contents: Read and write</b>. Generate, copy, paste it above.</p></details>
+        <div class="ed-two"><div class="ed-f"><label>DATA REPOSITORY</label><input id="fpub-repo" spellcheck="false"></div>
+          <div class="ed-f"><label>BRANCH</label><input id="fpub-branch" spellcheck="false"></div></div>
+        <label class="fpub-opt"><input type="checkbox" id="fpub-auto"> <span>Publish automatically once a day when something changed (runs while the app is open)</span></label>
+        <div class="fpub-status" id="fpub-status"></div>
+        <div class="fpub-row">
+          <button class="ed-btn go" id="fpub-go">PUBLISH NOW</button>
+          <button class="ed-btn" id="fpub-test">TEST</button>
+          <button class="ed-btn" id="fpub-save">SAVE</button>
+          <button class="ed-btn" id="fpub-close">CLOSE</button>
+        </div>
+      </div>`;
+    document.body.appendChild(ov);
+    const q = id=> document.getElementById(id);
+    const say = (txt, cls)=>{ const s = q('fpub-status'); s.className = 'fpub-status ' + (cls || ''); s.textContent = txt; };
+    const readForm = ()=>{
+      const p = { repo: q('fpub-repo').value.trim(), branch: q('fpub-branch').value.trim() || 'main', auto: q('fpub-auto').checked };
+      const t = q('fpub-token').value.trim(); if(t) p.token = t;
+      return p;
+    };
+    const refresh = ()=>{
+      const c = FPub.load();
+      q('fpub-repo').value = c.repo; q('fpub-branch').value = c.branch; q('fpub-auto').checked = !!c.auto; q('fpub-token').value = '';
+      q('fpub-token').placeholder = c.token ? 'token saved — paste a new one to replace it' : 'github_pat_…';
+      q('fpub-tokhint').textContent = c.token ? 'A token is saved on this device.' : 'No token saved yet.';
+      const st = FPub.dirty() ? 'Changes waiting to be published.' : 'Nothing new to publish.';
+      say((c.lastMsg ? 'Last published: ' + c.lastMsg + '\n' : 'Not published from this device yet.\n') + st);
+    };
+    q('fpub-close').addEventListener('click', ()=> ov.classList.remove('on'));
+    ov.addEventListener('click', e=>{ if(e.target === ov) ov.classList.remove('on'); });
+    q('fpub-save').addEventListener('click', ()=>{ FPub.set(readForm()); refresh(); say('Saved.\n' + q('fpub-status').textContent, 'ok'); });
+    q('fpub-test').addEventListener('click', async ()=>{
+      FPub.set(readForm()); say('Testing…');
+      const r = await FPub.test();
+      if(r.ok){ refresh(); say('✓ Token works for ' + r.repo + (r.isPrivate ? ' (private)' : ' (public)') + '.\n' + q('fpub-status').textContent, 'ok'); }
+      else say('✕ ' + r.error, 'err');
+    });
+    q('fpub-go').addEventListener('click', async ()=>{
+      FPub.set(readForm()); say('Publishing… (a few seconds)');
+      q('fpub-go').disabled = true;
+      const r = await FPub.publish();
+      q('fpub-go').disabled = false;
+      if(r.ok){ refresh(); say('✓ Published (' + Math.round(r.bytes / 1024) + ' KB). Other devices see it the next time they open the app (GitHub may take up to 5 minutes).\n' + q('fpub-status').textContent, 'ok'); try { toast('Published to GitHub'); } catch(e){} }
+      else say('✕ ' + r.error, 'err');
+    });
+    ov._refresh = refresh;
+  }
+  ov._refresh(); ov.classList.add('on');
+}
+
 
 const FL_STORE = 'flContent';
 
@@ -23893,6 +24177,8 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
     setTimeout(()=> URL.revokeObjectURL(a.href), 4000);
     toast('data.json downloaded (' + Math.round(blob.size/1024) + ' KB)');
   });
+
+  on('ed-publish','click', ()=> fpubOpen());
 
   on('ed-savefile','click', ()=>{
     if(typeof exportHtml === 'function') exportHtml();

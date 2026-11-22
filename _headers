@@ -4,6 +4,8 @@
   Referrer-Policy: strict-origin-when-cross-origin
 /data.json
   Cache-Control: no-cache
+/auto.json
+  Cache-Control: no-cache
 /sw.js
   Cache-Control: no-cache, no-store, must-revalidate
 /manifest.webmanifest
