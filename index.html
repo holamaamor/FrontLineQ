@@ -9021,6 +9021,7 @@ function flApplyRemote(data){
   if(did.ambargo){ run('renderAmbList'); }
   if(did.desk){ ['renderDeskFilters','renderDeskFeed'].forEach(run); }
   if(did.losses){ ['renderLossesGrid','applyLossesBanner'].forEach(run); }
+  if(did.events || did.ambargo || did.desk || did.losses) run('flReapplyDesign');   /* DESIGN-v3 */
   return true;
 }
 
@@ -13290,6 +13291,8 @@ function applyLossesBanner(){
     if(photo){ photo.style.backgroundImage = ''; photo.style.mixBlendMode = ''; }
   }
   el.style.setProperty('--lv-shade', lvBannerShade);
+  /* DESIGN-v3: tasarım modunda yüklenen başlık (banner) görseli geri gelsin */
+  try { if(typeof window.flReapplyBanner === 'function') window.flReapplyBanner(); } catch(e){}
 }
 
 const LOSSES_DATA = [
@@ -13326,6 +13329,8 @@ function renderLossesGrid(){
       <div class="lv-card-sub"><span>${item.sub}</span></div>
     </div>
   `).join('');
+  /* DESIGN-v3: tasarım modunda eklenen kart görselleri yeniden çizimde silinmesin */
+  try { if(typeof window.flReapplyCards === 'function') window.flReapplyCards(); } catch(e){}
 }
 renderLossesGrid();
 applyLossesBanner();
@@ -25803,6 +25808,9 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
   rebuildStateCss();
   try { if(sessionStorage.getItem('flAdmin') === '1') enterAdmin(); } catch(e){}
   window.FL_ADMIN = { edits, apply: applyEdits };
+  window.flReapplyCards = applyAllCards;     /* DESIGN-v3 */
+  window.flReapplyBanner = applyBanner;
+  window.flReapplyDesign = function(){ try { applyEdits(); } catch(e){} try { applyBanner(); } catch(e){} try { applyAllBgs(); } catch(e){} try { applyAllCards(); } catch(e){} };
  } catch(err){ console.error('Admin paneli başlatılamadı:', err); }
 })();
 
@@ -26389,7 +26397,7 @@ function fsClose(){
 <script>
 /* PWA-v2: servis işçisi — yalnızca http(s) üzerinde (file:// ve DOWNLOAD SITE kopyasında devre dışı) */
 (function(){
-  var BUILD = '20261123-0005';
+  var BUILD = '20261123-0050';
   var live = ('serviceWorker' in navigator) && /^https?:$/.test(location.protocol);
   var reg = null, lastKick = 0;
   function ctl(){ return live ? navigator.serviceWorker.controller : null; }
