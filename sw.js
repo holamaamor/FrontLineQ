@@ -9,7 +9,7 @@
    • data.json / auto.json (siteyle gelen kopya) → önce ağ (6 sn), olmazsa son önbellek
      (asıl güncel veri GitHub veri deposundan sayfa tarafından okunur — bkz. FL_DATA_BASE)
    • Leaflet / yazı tipleri → önbellekte kalır. Harita karoları, Telegram, Catbox vb. dış istekler → karışılmaz */
-const VER = '20261123-1130';
+const VER = '20261123-1745';
 const APP = 'fl-app';
 const DATA = 'fl-data';
 const LIBS = 'fl-libs-1';

@@ -1865,6 +1865,19 @@
     font-size:10px;color:var(--text-dim);letter-spacing:0.5px;
   }
   .event-unit{color:var(--gold);}
+
+     /* INS-v1: unit insignia in a thin hollow square (same colour as the unit name) */
+     .event-unit.has-ins{display:inline-flex;align-items:center;gap:7px;min-width:0;}
+     .ev-un{min-width:0;overflow-wrap:anywhere;}
+     .ev-ins{flex:none;box-sizing:border-box;width:20px;height:20px;border:1px solid currentColor;background:transparent;
+       display:inline-flex;align-items:center;justify-content:center;padding:2px;overflow:hidden;}
+     .ev-ins img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain;image-rendering:auto;}
+     .ev-ins-t{padding:3px 2px 2px;}
+     .ev-ins-t::before{content:attr(data-t);font:700 9px/1 'IBM Plex Mono',ui-monospace,monospace;letter-spacing:0;}
+     .ev-ins-t[data-n="3"]::before{font-size:7.5px;}
+     .ev-ins-t[data-n="4"]::before{font-size:6.5px;}
+     .fs-card .ev-ins{width:22px;height:22px;}
+     .event-meta{gap:8px;}
   .event-geo{color:var(--crimson);font-size:9px;margin-top:6px;}
   .event-src{color:var(--gold);font-size:8.5px;margin-top:4px;letter-spacing:0.5px;opacity:0.8;}
   .event-type{
@@ -6671,6 +6684,15 @@ const FLink = (function(){
   }
 
   /* ---------------- X / Twitter ---------------- */
+  /* every string inside an API object (except the listed keys) — used to find links wherever the API put them */
+  function collectStrings(o, skip, out, depth){
+    out = out || []; depth = depth || 0;
+    if(o == null || depth > 7 || out.length > 300) return out;
+    if(typeof o === 'string'){ if(o.length <= 3000) out.push(o); return out; }
+    if(Array.isArray(o)){ o.forEach(x=> collectStrings(x, skip, out, depth + 1)); return out; }
+    if(typeof o === 'object') Object.keys(o).forEach(k=>{ if(!(skip && skip[k])) collectStrings(o[k], skip, out, depth + 1); });
+    return out;
+  }
   function fromFx(j){
     const t = j && (j.tweet || j.status || j.post);
     if(!t) return null;
@@ -6690,6 +6712,7 @@ const FLink = (function(){
     const addFacets = rt=>{ if(rt && Array.isArray(rt.facets)) rt.facets.forEach(f=>{ ['original', 'replacement', 'display', 'url', 'expanded_url'].forEach(k=>{ if(f && typeof f[k] === 'string') links.push(f[k]); }); }); };
     addFacets(t.raw_text);
     if(t.quote && typeof t.quote === 'object'){ if(t.quote.text) links.push(t.quote.text); addFacets(t.quote.raw_text); }
+    try { collectStrings(t, { author:1, media:1, replies:1, avatar_url:1 }, links); } catch(e){}
     return { text: t.text || (t.raw_text && t.raw_text.text) || '', date, media, links, canonical: isHttp(t.url) ? t.url : '',
              author:{ name:a.name || '', handle: a.screen_name ? '@' + a.screen_name : '', avatar:isHttp(a.avatar_url) ? a.avatar_url : '' } };
   }
@@ -6706,7 +6729,7 @@ const FLink = (function(){
     let date = null;
     if(j.date_epoch) date = new Date(j.date_epoch * 1000);
     else if(j.date){ const d = new Date(j.date); if(!isNaN(d)) date = d; }
-    return { text:j.text || '', date, media, links:[ j.qrt && j.qrt.text ].filter(Boolean), canonical:isHttp(j.tweetURL) ? j.tweetURL : '',
+    return { text:j.text || '', date, media, links: collectStrings(j, { media_extended:1, mediaURLs:1, user_name:1, user_screen_name:1, user_profile_image_url:1 }, []), canonical:isHttp(j.tweetURL) ? j.tweetURL : '',
              author:{ name:j.user_name || '', handle: j.user_screen_name ? '@' + j.user_screen_name : '', avatar:isHttp(j.user_profile_image_url) ? j.user_profile_image_url : '' } };
   }
   async function resolveX(p){
@@ -6757,7 +6780,7 @@ const FLink = (function(){
     const r = fromFx({ tweet:t });
     if(!r) return null;
     const rt = t.replying_to, a = t.author || {};
-    return { id, text:r.text || '', date:r.date || snowflakeDate(id), media:r.media || [],
+    return { id, text:r.text || '', date:r.date || snowflakeDate(id), media:r.media || [], links:r.links || [],
       url: isHttp(t.url) ? t.url : '',
       user: String(a.screen_name || '').toLowerCase(),
       parent: String((rt && typeof rt === 'object' ? rt.status : t.replying_to_status) || ''),
@@ -11829,7 +11852,7 @@ function popupHtml(ev){
       <div class="popup-title">${esc(ev.title)}</div>
       <div class="popup-meta">
         <span class="popup-unit">${esc(ev.unit)}</span>
-        <span>${esc(ev.dateLabel || ev.date)}</span>
+        <span>${esc(flDateUS(ev.dateLabel || ev.date))}</span>
       </div>
       <div class="popup-type">${esc(ev.type)}</div>
       ${opHtml}
@@ -12115,6 +12138,67 @@ function evSeq(ev){
 
 /* tek bir olay kartının HTML'i — hem normal front/sektör listesinde
    hem de aşağıdaki "en son haber" sabit kartında kullanılır */
+/* INS-v1 / DATE-v1 ------------------------------------------------------------------------------------------
+   flDateUS('2026-12-05') / ('5 DEC 2026') -> 'Dec 5, 2026' (month as text, American order). Anything else is returned unchanged.
+   flUnitHtml(label) -> the unit name, preceded (when the unit is known) by its MilitaryLand insignia inside a thin hollow square.
+   The square has the same colour as the unit name (site gold; theme overrides follow). Units without an insignia image get the
+   unit number (or first letter) in the square, like the map plates do. No unit / "—" / "unknown" -> plain text, no square. */
+function flDateUS(v){
+  const M = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const t = String(v == null ? '' : v).trim();
+  if(!t) return t;
+  let m = t.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s][\s\S]*)?$/);
+  if(m){ const mo = +m[2], d = +m[3]; return (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) ? M[mo - 1] + ' ' + d + ', ' + m[1] : t; }
+  m = t.match(/^(\d{1,2})(?:st|nd|rd|th)?\s+([A-Za-z]{3,9})\.?,?\s+(\d{4})$/);
+  if(m){ const i = M.findIndex(x=> x.toLowerCase() === m[2].slice(0, 3).toLowerCase()); if(i >= 0) return M[i] + ' ' + (+m[1]) + ', ' + m[3]; }
+  return t;
+}
+const FL_INS_BLOB = {};
+let FL_INS_CACHE = new Map(), FL_INS_IDX = null;
+function flInsUrl(id){
+  if(FL_INS_BLOB[id]) return FL_INS_BLOB[id];
+  const b64 = (typeof FL_INS !== 'undefined' && FL_INS) ? FL_INS[id] : '';
+  if(!b64) return '';
+  let url = 'data:image/png;base64,' + b64;
+  try {
+    const bin = atob(b64), a = new Uint8Array(bin.length);
+    for(let i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i);
+    url = URL.createObjectURL(new Blob([a], { type:'image/png' }));
+  } catch(e){}
+  return (FL_INS_BLOB[id] = url);
+}
+function flUnitIns(label){
+  const u = String(label == null ? '' : label).trim();
+  if(!u || /^[—–-]+$/.test(u) || /^(?:not attributed|unknown|unattributed)\b/i.test(u)) return null;
+  let I = null; try { I = FUnit.index(); } catch(e){}
+  if(I !== FL_INS_IDX){ FL_INS_CACHE = new Map(); FL_INS_IDX = I; }
+  if(FL_INS_CACHE.has(u)) return FL_INS_CACHE.get(u);
+  let res = null;
+  try {
+    const r = FUnit.detect([u], { noHandle:true });
+    const meta = (r && !r.ambiguous && typeof UA_ML !== 'undefined' && UA_ML.u) ? (UA_ML.u[r.cl] || UA_ML.u[r.id] || null) : null;
+    const url = meta && meta[0] ? flInsUrl(meta[0]) : '';
+    if(url) res = { url:url };
+  } catch(e){}
+  if(!res){
+    const plain = u.replace(/[«»"“”„‘’'()\[\]]/g, ' ').replace(/\s+/g, ' ').trim();
+    const nm = plain.match(/^(\d{1,4})/);
+    const t = (nm ? nm[1] : (plain.match(/[A-Za-zА-Яа-яІіЇїЄє]/) || [''])[0].toUpperCase()).slice(0, 4);
+    res = t ? { t:t } : null;
+  }
+  FL_INS_CACHE.set(u, res);
+  return res;
+}
+function flUnitHtml(label){
+  const ins = flUnitIns(label);
+  const nm = esc(label);
+  if(!ins) return '<span class="event-unit">' + nm + '</span>';
+  return '<span class="event-unit has-ins">'
+    + (ins.url ? '<span class="ev-ins"><img src="' + ins.url + '" alt="" decoding="async" draggable="false"></span>'
+               : '<span class="ev-ins ev-ins-t" data-t="' + esc(ins.t) + '" data-n="' + ins.t.length + '"></span>')
+    + '<span class="ev-un">' + nm + '</span></span>';
+}
+
 function eventCardHTML(ev){
   const i = EVENTS.indexOf(ev);
   const opHtml = (ev.operation && ev.operation !== 'Unnamed' && ev.operation !== '—')
@@ -12136,8 +12220,8 @@ function eventCardHTML(ev){
   <div class="event-card" data-i="${i}" style="--tc:${TYPE_COLORS[ev.type]||'#ff9603'}">
     <div class="event-title">${esc(ev.title)}</div>
     <div class="event-meta">
-      <span class="event-unit">${esc(ev.unit)}</span>
-      <span>${esc(ev.dateLabel || ev.date)}</span>
+      ${flUnitHtml(ev.unit)}
+      <span>${esc(flDateUS(ev.dateLabel || ev.date))}</span>
     </div>
     <div class="event-type" style="border-color:${TYPE_COLORS[ev.type]||'var(--line)'};color:${TYPE_COLORS[ev.type]||'var(--text-dim)'}">${esc(ev.type)}</div>
     ${opHtml}
@@ -12473,7 +12557,7 @@ setActiveDate('all');
     if(where) row('Sector', where);
     if(evs.length){
       row('Events', '<b>' + evs.length + '</b> on this map'
-        + evs.slice(0, 3).map(ev=> '<span class="up-ev">' + esc2(ev.dateLabel || ev.date || '') + ' — ' + esc2(ev.title || '') + '</span>').join(''));
+        + evs.slice(0, 3).map(ev=> '<span class="up-ev">' + esc2(flDateUS(ev.dateLabel || ev.date || '')) + ' — ' + esc2(ev.title || '') + '</span>').join(''));
     }
     if(u.alias.length) row('Also', esc2(u.alias.slice(0, 3).map(plain).join('; ')) + (u.alias.length > 3 ? ' …' : ''));
     h += '<div class="up-foot">Ukraine Control Map · ' + esc2(fmtDate(info.snap))
@@ -12922,8 +13006,8 @@ function setActiveDate(dateStr){
     el.textContent =
       (!activeDate || activeDate === 'all') ? `All dates · ${shown} records`
       : activeDate.includes('..')
-        ? `${activeDate.replace('..',' → ')} · ${shown} records`
-        : `${activeDate} · ${shown} records`;
+        ? `${activeDate.split('..').map(flDateUS).join(' → ')} · ${shown} records`
+        : `${flDateUS(activeDate)} · ${shown} records`;
   }
 }
 
@@ -15363,7 +15447,7 @@ function renderDeskFeed(){
         <div class="desk-meta">
           <div class="desk-platform">${d.platform}</div>
           ${thv ? `<div class="desk-thread-badge">THREAD${thv.total ? ' · ' + thv.total : ''}</div>` : ''}
-          <div>${d.date}${age.label ? ` <span class="desk-relative">· ${age.label}</span>` : ''}</div>
+          <div>${flDateUS(d.date)}${age.label ? ` <span class="desk-relative">· ${age.label}</span>` : ''}</div>
           <div class="desk-kind-badge">${DESK_KINDS[d.kind]}</div>
         </div>
       </div>
@@ -21883,7 +21967,7 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
         if(typeof renderAmbargo === 'function') renderAmbargo();
       },
       title:d=> d.name,
-      meta:d=> `${d.date} · ${d.oblast||''} ${d.loc&&d.loc!=='—'?'· '+d.loc:''} · ${(AMB_TYPES[d.type]||{}).label||d.type}`,
+      meta:d=> `${flDateUS(d.date)} · ${d.oblast||''} ${d.loc&&d.loc!=='—'?'· '+d.loc:''} · ${(AMB_TYPES[d.type]||{}).label||d.type}`,
       fields:[
         {sec:'TARGET'},
         {k:'name', l:'Target name', req:true, ph:'e.g. Ryazan oil refinery'},
@@ -21936,7 +22020,7 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
         if(typeof calRender==='function') calRender();
       },
       title:d=> d.title,
-      meta:d=> `${d.date} · ${d.front||''} / ${d.sector||''} · ${d.type||''}`,
+      meta:d=> `${flDateUS(d.date)} · ${d.front||''} / ${d.sector||''} · ${d.type||''}`,
       fields:[
         {sec:'EVENT'},
         {k:'title', l:'Title', req:true, ph:'e.g. FPV drone destroyed a Russian truck'},
@@ -21997,7 +22081,7 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
                     if(typeof renderDeskFeed==='function') renderDeskFeed();
                     if(typeof renderDeskOverview==='function') renderDeskOverview(); },
       title:d=> d.handle,
-      meta:d=> `${d.date} · ${(DESK_KINDS[d.kind]||d.kind)} · ${d.platform||''}`,
+      meta:d=> `${flDateUS(d.date)} · ${(DESK_KINDS[d.kind]||d.kind)} · ${d.platform||''}`,
       fields:[
         {sec:'SOURCE'},
         {k:'handle', l:'Source name', req:true, ph:'e.g. @Tatarigami_UA'},
@@ -23605,8 +23689,24 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
         res.notes = (res.notes || []).concat('Main source: the Telegram post found in the link\'s content (' + tgm.replace(/^https:\/\//, '') + ')'
           + (res.tgLinks.length > 1 ? ' — ' + (res.tgLinks.length - 1) + ' more Telegram link' + (res.tgLinks.length > 2 ? 's' : '') + ' in it: ' + res.tgLinks.slice(1, 4).map(u=> u.replace(/^https:\/\//, '')).join(', ') : '')
           + '. The pasted link itself was not used as the main source.');
+        if(res.tgFrom) res.notes.push('The Telegram link is in another post of the same thread (' + String(res.tgFrom).replace(/^https:\/\//, '') + ').');
+        /* a Main source that only holds the pasted link itself (filled by an earlier run on the same link) is replaced */
+        try {
+          const mel = document.querySelector('#ed-form [data-k="mainSrc"]');
+          const sid = u=> { const m = /\/status\/(\d+)/.exec(String(u || '')); return m ? m[1] : ''; };
+          const cur = mel ? String(mel.value).trim() : '';
+          if(cur && (cur === link || cur === res.url || cur === res.canonical || (sid(cur) && sid(cur) === sid(link)))) mel.value = '';
+        } catch(e){}
+      } else if(res.platform === 'x' && !res.partial){
+        const seen = [];
+        String((res.links || []).join('\n')).replace(/https?:\/\/[^\s"'<>)\]]+/gi, u=>{
+          if(!/^https?:\/\/(?:www\.)?(?:x\.com|twitter\.com|pbs\.twimg\.com|video\.twimg\.com|abs\.twimg\.com|api\.fxtwitter\.com)\b/i.test(u) && seen.indexOf(u) < 0) seen.push(u);
+          return u;
+        });
+        res.notes = (res.notes || []).concat('No Telegram post link found in this post or in its thread' + (seen.length ? ' (links seen: ' + seen.slice(0, 3).map(u=> u.replace(/^https?:\/\//, '')).join(', ') + ')' : ' (the post contains no links)') + ' — the pasted link is the main source.');
       }
-      edPut('mainSrc', tgm || link, tgm ? 'main source (Telegram)' : 'main source', filled);
+      if(!edPut('mainSrc', tgm || link, tgm ? 'main source (Telegram)' : 'main source', filled) && tgm)
+        res.notes = (res.notes || []).concat('Main source was already filled, so it was left as it is — the Telegram post is ' + tgm.replace(/^https:\/\//, '') + '.');
       if(res.coords) edPut('coord', res.coords[0] + ', ' + res.coords[1], 'coordinates', filled);
       if(mi && mi.videos) edPut('video', '1', 'video flag', filled);
       try { res.notes = (res.notes || []).concat(edUnitFill(res, filled)); } catch(e){}
@@ -23949,6 +24049,23 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
           const nm = th.parts.reduce((n, x)=> n + (x.media || []).length, 0);
           res.notes = (res.notes || []).concat(['Thread: ' + th.parts.length + ' posts, ' + nm + ' media (' + th.via + '). Each post after the first is in the THREAD section below — edit or remove what you do not need.'].concat(th.notes || []));
         }
+      }
+      /* TGSRC-v2: events — no Telegram post in the post itself: look in the rest of the author's thread (a source link is often a self-reply) */
+      if(edTab === 'events' && res.platform === 'x' && !res.partial && !(res.tgLinks && res.tgLinks.length)){
+        try {
+          edLinkStatus('Looking for a Telegram link in the rest of the thread…', 'busy');
+          const th = await FLink.resolveThread(FLink.parse(url));
+          if(edTab !== tab0 || edEditIndex !== edit0 || !document.getElementById('ed-link-status')){
+            toast('The form changed while fetching — result discarded'); return;
+          }
+          if(th && th.parts && th.parts.length >= 2){
+            const found = []; let from = '';
+            th.parts.forEach(x=>{
+              FLink.tgPostLinks([x.text].concat(x.links || [])).forEach(u=>{ if(found.indexOf(u) < 0){ found.push(u); if(!from) from = x.url || ''; } });
+            });
+            if(found.length){ res.tgLinks = found; res.tgFrom = from; }
+          }
+        } catch(e){ /* thread endpoint down — the pasted link stays the main source */ }
       }
       await edTranslateRes(res);
       if(res.threadRest) await edTranslateThread(res);
@@ -26246,7 +26363,7 @@ function lbRender(){
   }
   if(d.weapon) bits.push(['WEAPON', d.weapon]);
   if(d.operation && d.operation !== 'Unnamed') bits.push(['OP', d.operation]);
-  bits.push(['DATE', d.date]);
+  bits.push(['DATE', flDateUS(d.date)]);
   if(!d._noCoords && d.coords) bits.push(['COORDS', d.coords[0].toFixed(5) + ', ' + d.coords[1].toFixed(5)]);
   /* GEOLB-v1: a geolocated event lists only its MAIN source here — the geolocation sources are in the strip below */
   const srcChips = (d._kind === 'event' && d._geo)
@@ -26372,13 +26489,13 @@ function fsCardHtml(ev){
     <div class="event-card fs-card" data-i="${i}" style="--tc:${TYPE_COLORS[ev.type]||'#ff9603'}">
       <div class="event-title">${esc(ev.title)}</div>
       <div class="event-meta">
-        <span class="event-unit">${esc(ev.unit)}</span>
-        <span>${esc(ev.dateLabel || ev.date)}</span>
+        ${flUnitHtml(ev.unit)}
+        <span>${esc(flDateUS(ev.dateLabel || ev.date))}</span>
       </div>
       <div class="event-type" style="border-color:${TYPE_COLORS[ev.type]||'var(--line)'};color:${TYPE_COLORS[ev.type]||'var(--text-dim)'}">${esc(ev.type)}</div>
       ${opHtml}
       ${ev.geo ? `<div class="event-geo">● GEOLOCATED</div>`
-               : `<div class="event-geo event-nogeo">○ KONUMSUZ</div>`}
+               : `<div class="event-geo event-nogeo">○ NO LOCATION</div>`}
       ${evMedHtml}
     </div>`;
 }
@@ -26697,7 +26814,7 @@ function fsClose(){
 <script>
 /* PWA-v2: servis işçisi — yalnızca http(s) üzerinde (file:// ve DOWNLOAD SITE kopyasında devre dışı) */
 (function(){
-  var BUILD = '20261123-1130';
+  var BUILD = '20261123-1745';
   var live = ('serviceWorker' in navigator) && /^https?:$/.test(location.protocol);
   var reg = null, lastKick = 0;
   function ctl(){ return live ? navigator.serviceWorker.controller : null; }
