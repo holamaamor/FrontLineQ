@@ -9477,7 +9477,7 @@ function fpubOpen(){
             <button class="ed-btn" id="fpub-rel" style="display:none">RELOAD NOW</button>
             <button class="ed-btn" id="fpub-rst">RESET APP COPY</button>
           </div>
-          <div class="fpub-p" style="margin:8px 0 0">Reset removes only the stored copy of the app and re-downloads it (about 36 MB). Your content and settings are not touched.</div>
+          <div class="fpub-p" style="margin:8px 0 0">Reset removes only the stored copy of the app and re-downloads it (about 15 MB). Your content and settings are not touched.</div>
         </div>
       </div>`;
     document.body.appendChild(ov);
@@ -9529,11 +9529,14 @@ function fpubOpen(){
     q('fpub-chk').addEventListener('click', async ()=>{
       const A = window.FLApp; if(!A) return;
       const b = q('fpub-chk'); b.disabled = true; say('Checking for a new version… (a new download can take a minute or two)');
+      const prog = e=>{ if(e.data && e.data.type === 'fl-progress') say('Downloading the new version… part ' + e.data.done + ' of ' + e.data.total); };
+      try { navigator.serviceWorker.addEventListener('message', prog); } catch(_){}
       const r = await A.check(); b.disabled = false; appInfo();
+      try { navigator.serviceWorker.removeEventListener('message', prog); } catch(_){}
       if(!r) say('✕ Could not reach the update service. Close and reopen the app, or use RESET APP COPY.', 'err');
       else if(r.result === 'same') say('✓ You are on the latest version.', 'ok');
-      else if(r.result === 'new'){ say('✓ A new version was downloaded. Tap RELOAD NOW.', 'ok'); q('fpub-rel').style.display = ''; }
-      else say('✕ The check failed (no connection or the download was cut). Try again on Wi‑Fi.', 'err');
+      else if(r.result === 'new'){ say('✓ A new version was downloaded' + (r.info ? ' (' + r.info + ')' : '') + '. Tap RELOAD NOW.', 'ok'); q('fpub-rel').style.display = ''; }
+      else say('✕ The check failed' + (r.info ? ': ' + r.info : ' (no connection or the download was cut)') + '. Try again — a part that failed is retried, nothing is lost.', 'err');
     });
     q('fpub-rel').addEventListener('click', ()=> location.reload());
     let rstT = 0;
@@ -26814,7 +26817,7 @@ function fsClose(){
 <script>
 /* PWA-v2: servis işçisi — yalnızca http(s) üzerinde (file:// ve DOWNLOAD SITE kopyasında devre dışı) */
 (function(){
-  var BUILD = '20261123-1745';
+  var BUILD = '20261123-1840';
   var live = ('serviceWorker' in navigator) && /^https?:$/.test(location.protocol);
   var reg = null, lastKick = 0;
   function ctl(){ return live ? navigator.serviceWorker.controller : null; }
