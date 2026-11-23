@@ -5114,8 +5114,7 @@
       December 2024; September 2026: 46,230); on 8 November the General Staff reported 16,130 for
       1–7 November, its highest weekly total (Kyiv Post). ISW calculated that Russia advanced only
       ~37.85 km² in July — meaning <b>an average of <b>1,132</b> losses for every km² seized</b> that month.
-      See the <b>CARGO200</b> tab for the confirmed named death toll; the 276,113 figure there (Mediazona's
-      09.10.2026 update) is a
+      See the <b>CARGO200</b> tab for the confirmed named death toll; the <span id="lv-mz-num">285,881</span> figure there (Mediazona's <span id="lv-mz-date">06.11.2026</span> update) is a
       confirmed <i>lower bound</i> and should not be confused with the estimate on this page.
     </div>
   </div>
@@ -5186,7 +5185,7 @@
 
     <div class="sk-counter">
       <div class="sk-counter-value" id="sk-counter-value">0</div>
-      <div class="sk-counter-label" id="sk-counter-label">CONFIRMED SOLDIERS KILLED (09.10.2026)</div>
+      <div class="sk-counter-label" id="sk-counter-label">CONFIRMED SOLDIERS KILLED (06.11.2026)</div>
     </div>
 
     <div class="sk-stats" id="sk-stats"></div>
@@ -5235,7 +5234,7 @@
     <div class="sk-footnote" id="sk-footnote-mz">
       Source: <a href="https://en.zona.media/article/2026/10/09/casualties_eng-trl" target="_blank" rel="noopener">Mediazona — "Russian losses in the war with Ukraine"</a>,
       based on the named-list project Mediazona runs with the BBC's Russian service and a team of volunteers,
-      verified from open sources (named-list total, officers, known dates/ages and the top-three regions last updated: 09.10.2026; the deaths-by-year breakdown reflects earlier updates; the map layer is a snapshot of the 200.zona.media point file of the same day). The statistical estimate was developed with
+      verified from open sources (<span id="sk-fn-upd">named-list total, officers, generals, known dates and ages last updated: 06.11.2026; the top-three regions and the deaths-by-year breakdown keep the date of their own last update (marked where shown); the map layer is a snapshot of the 200.zona.media point file of 09.10.2026</span>). The statistical estimate was developed with
       Probate Registry data in cooperation with Meduza (last updated: 09.05.2026, an estimate as of end of
       December 2025). The named list is inherently incomplete — not every death is publicly reported; the
       estimation method tries to close that gap statistically. The figures have not been confirmed by Russia.
@@ -9092,7 +9091,71 @@ function flFetchJson(name){
   return p.catch(()=> get('./' + name, false));
 }
 
-/* auto.json: { updated, deepstate:{date, zones}, ua:{snap, pos, names}, losses:{date, dateLabel, items:[{label,value,delta}], via, bulletin} } */
+/* AUTO-v2: Mediazona (CARGO200). auto.json.cargo200 = { date:'YYYY-MM-DD', named:{value,label?}, estimate?:{value,label?},
+   stats?:[{value,label,asof?}], regions?:[{name,value,note?}], footnote?:string }.
+   Uygulanır: tarih >= sitenin gömülü anlık görüntüsünün tarihi (SKULL_BASE_DATE). Daha yeni bir site yayını varsa eski auto.json onu geri almaz. */
+function flApplyCargo(c, later){
+  if(!c || typeof c !== 'object') return false;
+  let ready = false;
+  try { ready = typeof SKULL_DATA !== 'undefined' && typeof setSkullMode === 'function' && typeof SKULL_BASE_DATE !== 'undefined'; } catch(e){}
+  if(!ready){ if(!later) window.addEventListener('load', ()=> flApplyCargo(c, true)); return false; }
+  const date = String(c.date || '');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < SKULL_BASE_DATE) return false;
+  const num = v => { const n = Number(String(v == null ? '' : v).replace(/[,\s]/g, '')); return (isFinite(n) && n > 0) ? Math.round(n) : 0; };
+  const clean = v => String(v == null ? '' : v).replace(/[<>&]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
+  const dmy = d => d.slice(8, 10) + '.' + d.slice(5, 7) + '.' + d.slice(0, 4);
+  const nv = c.named ? num(c.named.value) : 0;
+  if(!(nv >= 200000 && nv <= 3000000)) return false;                       /* makul aralık dışı → hatalı veri, uygulama */
+  if(nv < SKULL_DATA.named.value) return false;                            /* adlandırılmış liste yalnızca büyür */
+  SKULL_DATA.named.value = nv;
+  SKULL_DATA.named.label = clean(c.named.label) || ('CONFIRMED SOLDIERS KILLED (NAMED LIST, ' + dmy(date) + ')');
+  if(c.estimate && num(c.estimate.value) >= 100000){
+    SKULL_DATA.estimate.value = num(c.estimate.value);
+    if(clean(c.estimate.label)) SKULL_DATA.estimate.label = clean(c.estimate.label);
+  }
+  let yearsFresh = false;
+  if(Array.isArray(c.stats)) c.stats.forEach(e=>{
+    const label = clean(e && e.label), value = clean(e && e.value);
+    if(!label || !value) return;
+    if(/DIED IN|KNOWN TO HAVE DIED/.test(label)) yearsFresh = true;
+    const t = SKULL_DATA.stats.find(x=> x.label === label);
+    if(t){ t.value = value; if(e.asof) t.asof = clean(e.asof); else delete t.asof; }
+    else { const o = { value, label }; if(e.asof) o.asof = clean(e.asof); SKULL_DATA.stats.push(o); }
+  });
+  let regionsFresh = false;
+  if(Array.isArray(c.regions)){
+    const rg = c.regions.map(r=> ({ name: clean(r && r.name), value: num(r && r.value), note: clean(r && r.note) })).filter(r=> r.name && r.value);
+    if(rg.length){
+      const mx = Math.max.apply(null, rg.map(r=> r.value));
+      SKULL_DATA.regions = rg.map(r=> ({ name: r.name, value: r.value, note: r.note, pct: Math.round(r.value / mx * 100) }));
+      regionsFresh = true;
+    }
+  }
+  try {
+    const fn = document.getElementById('sk-fn-upd');
+    if(fn) fn.textContent = c.footnote ? String(c.footnote).replace(/[<>]/g, ' ').slice(0, 700)
+      : 'named-list total, officers, generals, known dates and ages' + (regionsFresh ? ', top regions' : '') + (yearsFresh ? ' and deaths by year' : '') + ' last updated: ' + dmy(date)
+        + ((regionsFresh && yearsFresh) ? '' : '; ' + [regionsFresh ? '' : 'the top-three regions', yearsFresh ? '' : 'the deaths-by-year breakdown'].filter(Boolean).join(' and ') + ' keep the date of their own last update (marked where shown)')
+        + '; the map layer is a snapshot of the 200.zona.media point file of ' + dmy(SKULL_MAP_DATE);
+    const set = (id, txt)=>{ const el = document.getElementById(id); if(el) el.textContent = txt; };
+    set('lv-mz-num', nv.toLocaleString('en-US'));
+    set('lv-mz-date', dmy(date));
+  } catch(e){}
+  try {                                                                      /* Rosstat modundaki "REFERENCE · MEDIAZONA" çubuğu aynı rakamı göstersin */
+    const R = SKULL_DATA.rosstat;
+    if(R && Array.isArray(R.sections)){
+      R.sections.forEach(sec=> (sec.bars || []).forEach(b=>{
+        if(/^REFERENCE · MEDIAZONA \/ BBC/.test(b.name)){ b.value = nv; b.note = 'Named deaths as of ' + dmy(date) + ' — not part of the leak; the same figure as the NAMED LIST tab.'; }
+      }));
+      if(typeof renderRosstat === 'function') renderRosstat();
+    }
+  } catch(e){ console.warn('[FL] cargo200 rosstat ref', e); }
+  try { renderSkullStats(); renderSkullBars(); setSkullMode(skullMode); } catch(e){ console.warn('[FL] cargo200 render', e); }
+  window.__flCargoApplied = date;
+  return true;
+}
+
+/* auto.json: { updated, deepstate:{date, zones}, ua:{snap, pos, names}, losses:{date, dateLabel, items:[{label,value,delta}], via, bulletin}, cargo200:{…} } */
 function flApplyAuto(a){
   if(!a || typeof a !== 'object') return false;
   const did = [];
@@ -9138,6 +9201,7 @@ function flApplyAuto(a){
       did.push('losses');
     }
   } catch(e){ console.warn('[FL] auto losses', e); }
+  try { if(a.cargo200 && flApplyCargo(a.cargo200)) did.push('cargo200'); } catch(e){ console.warn('[FL] auto cargo200', e); }
   if(did.length) console.info('[FL] auto.json uygulandı: ' + did.join(', ') + ' · ' + (a.updated || ''));
   return did.length > 0;
 }
@@ -15380,23 +15444,25 @@ renderDeskOverview();
    BBC News Russian) named-list project. Source:
    https://en.zona.media/article/2026/10/09/casualties_eng-trl
    ===================================================================== */
+const SKULL_BASE_DATE = '2026-11-06';   /* AUTO-v2: auto.json.cargo200 is applied only if its date >= this (the date of the figures below) */
+const SKULL_MAP_DATE = '2026-10-09';    /* date of the embedded 200.zona.media point snapshot (map layer) */
 const SKULL_DATA = {
   named:{
-    value: 276113,
-    label: "CONFIRMED SOLDIERS KILLED (NAMED LIST, 09.10.2026)",
+    value: 285881,
+    label: "CONFIRMED SOLDIERS KILLED (NAMED LIST, 06.11.2026)",
   },
   estimate:{
     value: 352000,
     label: "STATISTICAL ESTIMATE (PROBATE REGISTRY, AS OF END OF DECEMBER 2025)",
   },
   stats: [
-    { value:"7,833", label:"CONFIRMED OFFICERS KILLED" },
+    { value:"7,983", label:"CONFIRMED OFFICERS KILLED" },
     { value:"15", label:"CONFIRMED GENERALS KILLED" },
-    { value:"259,800", label:"CASES WITH KNOWN DATE OF DEATH" },
-    { value:"261,300", label:"CASES WITH KNOWN AGE" },
-    { value:"6,600", label:"KNOWN TO HAVE DIED IN 2026" },
-    { value:"59,700", label:"DIED IN 2025" },
-    { value:"95,600", label:"DIED IN 2024" },
+    { value:"272,100", label:"CASES WITH KNOWN DATE OF DEATH" },
+    { value:"274,000", label:"CASES WITH KNOWN AGE" },
+    { value:"6,600", label:"KNOWN TO HAVE DIED IN 2026", asof:"09.10.2026" },
+    { value:"59,700", label:"DIED IN 2025", asof:"09.10.2026" },
+    { value:"95,600", label:"DIED IN 2024", asof:"09.10.2026" },
   ],
   regions: [
     { name:"BASHKORTOSTAN", value:11700, note:"per the 09.10.2026 update (rounded)", pct:100 },
@@ -15462,7 +15528,7 @@ function renderSkullStats(){
   el.innerHTML = list.map(s => `
     <div class="sk-stat">
       <div class="sk-stat-value">${s.value}</div>
-      <div class="sk-stat-label">${s.label}</div>
+      <div class="sk-stat-label">${s.label}${s.asof ? ' · AS OF ' + s.asof : ''}</div>
     </div>
   `).join('');
 }
@@ -15535,7 +15601,7 @@ SKULL_DATA.rosstat = {
         { name:"MEDUZA / UKRAINSKA PRAVDA", value:410000, disp:"~410,000", note:"Deaths tied to combat operations and their consequences." },
         { name:"CYBER PARTISANS (HEADLINE)", value:393881, cls:"alt", note:"Military personnel or civilians killed in combat or by the long-term effects of fighting; the narrower of the two hacker groups’ counts." },
         { name:"BLOOMBERG", value:392700, disp:"~392,700", note:"Certificates that link the death to the war by classification code or by references to a military operation, shelling or drones (24 Feb 2022 – late Aug 2026)." },
-        { name:"REFERENCE · MEDIAZONA / BBC NAMED LIST", value:285881, cls:"ref", note:"Named deaths as of 6 Nov 2026 — not part of the leak. The NAMED LIST tab of this page still shows the 09.10.2026 snapshot (276,113)." },
+        { name:"REFERENCE · MEDIAZONA / BBC NAMED LIST", value:285881, cls:"ref", note:"Named deaths as of 6 Nov 2026 — not part of the leak; the same figure as the NAMED LIST tab." },
         { name:"REFERENCE · MEDUZA / MEDIAZONA ESTIMATE", value:352000, cls:"ref", note:"Probate-registry estimate through end-2025 — a different method and period; not part of the leak." },
       ],
       note: "<b>Do not add or average these.</b> Every count leaves out people with no death certificate (most of the missing, many unidentified bodies). Bloomberg says the true toll is likely higher; economist Janis Kluge says it could approach 500,000.",
@@ -26590,7 +26656,7 @@ function fsClose(){
 <script>
 /* PWA-v2: servis işçisi — yalnızca http(s) üzerinde (file:// ve DOWNLOAD SITE kopyasında devre dışı) */
 (function(){
-  var BUILD = '20261123-0215';
+  var BUILD = '20261123-1100';
   var live = ('serviceWorker' in navigator) && /^https?:$/.test(location.protocol);
   var reg = null, lastKick = 0;
   function ctl(){ return live ? navigator.serviceWorker.controller : null; }

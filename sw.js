@@ -1,5 +1,5 @@
 /* FRONTLINES — service worker (çevrimdışı açılış + sağlam otomatik güncelleme)
-   Sürüm: 20261123-0215
+   Sürüm: 20261123-1100
    • Kurulum hafif: hiçbir büyük dosya indirmez, anında biter (eskiden 36 MB'lık sayfa kurulumda iniyordu;
      telefonda yarım kalınca yeni sürüm hiç devreye giremiyordu).
    • index.html → önce önbellek (anında açılır). Arkada önce küçük bir HEAD isteğiyle "değişti mi?" bakılır;
@@ -9,7 +9,7 @@
    • data.json / auto.json (siteyle gelen kopya) → önce ağ (6 sn), olmazsa son önbellek
      (asıl güncel veri GitHub veri deposundan sayfa tarafından okunur — bkz. FL_DATA_BASE)
    • Leaflet / yazı tipleri → önbellekte kalır. Harita karoları, Telegram, Catbox vb. dış istekler → karışılmaz */
-const VER = '20261123-0215';
+const VER = '20261123-1100';
 const APP = 'fl-app';
 const DATA = 'fl-data';
 const LIBS = 'fl-libs-1';
