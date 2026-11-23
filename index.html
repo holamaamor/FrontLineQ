@@ -6638,6 +6638,22 @@ const FLink = (function(){
   }
 
   /* ---------------- sonuç kalıbı ---------------- */
+  /* TGSRC-v1: Telegram POST links (t.me/channel/123) found inside what a pasted link contains — the post text, the quoted post,
+     X link cards / expanded URLs, the body of a web page. Quick Add uses the first one as the event's MAIN SOURCE. Channel-only links
+     (t.me/channel), share links, invite links and truncated display forms ("t.me/chan/12…") are not posts and are ignored. */
+  const TG_POST_RE = /(?<![\w.\/@-])(?:https?:\/\/)?(?:www\.)?(?:t\.me|telegram\.me|telegram\.dog)\/((?:s\/)?[A-Za-z][A-Za-z0-9_]{3,31}|c\/\d{4,20})\/(\d{1,12})(?![\d…]|\.\.\.)/gi;
+  const TG_NOT_CHANNEL = /^(?:share|joinchat|addstickers|addemoji|addtheme|addlist|proxy|socks|iv|setlanguage|login|invoice|boost|contact|bg|confirmphone|giftcode|m|s)$/i;
+  function tgPostLinks(parts){
+    const out = [];
+    String((parts || []).filter(Boolean).join('\n')).replace(TG_POST_RE, (m, ch, id)=>{
+      const chan = ch.replace(/^s\//i, '');
+      if(TG_NOT_CHANNEL.test(chan)) return m;
+      const u = 'https://t.me/' + chan + '/' + id;
+      if(out.indexOf(u) < 0) out.push(u);
+      return m;
+    });
+    return out;
+  }
   function base(platform, url){
     return { ok:true, platform, url, canonical:url, title:'', text:'', site:'', date:null,
              author:{ name:'', handle:'', avatar:'' }, media:[], notes:[], via:'', partial:false };
@@ -6670,7 +6686,11 @@ const FLink = (function(){
     let date = null;
     if(t.created_timestamp) date = new Date(t.created_timestamp * 1000);
     else if(t.created_at){ const d = new Date(t.created_at); if(!isNaN(d)) date = d; }
-    return { text: t.text || (t.raw_text && t.raw_text.text) || '', date, media, canonical: isHttp(t.url) ? t.url : '',
+    const links = [];
+    const addFacets = rt=>{ if(rt && Array.isArray(rt.facets)) rt.facets.forEach(f=>{ ['original', 'replacement', 'display', 'url', 'expanded_url'].forEach(k=>{ if(f && typeof f[k] === 'string') links.push(f[k]); }); }); };
+    addFacets(t.raw_text);
+    if(t.quote && typeof t.quote === 'object'){ if(t.quote.text) links.push(t.quote.text); addFacets(t.quote.raw_text); }
+    return { text: t.text || (t.raw_text && t.raw_text.text) || '', date, media, links, canonical: isHttp(t.url) ? t.url : '',
              author:{ name:a.name || '', handle: a.screen_name ? '@' + a.screen_name : '', avatar:isHttp(a.avatar_url) ? a.avatar_url : '' } };
   }
   function fromVx(j){
@@ -6686,7 +6706,7 @@ const FLink = (function(){
     let date = null;
     if(j.date_epoch) date = new Date(j.date_epoch * 1000);
     else if(j.date){ const d = new Date(j.date); if(!isNaN(d)) date = d; }
-    return { text:j.text || '', date, media, canonical:isHttp(j.tweetURL) ? j.tweetURL : '',
+    return { text:j.text || '', date, media, links:[ j.qrt && j.qrt.text ].filter(Boolean), canonical:isHttp(j.tweetURL) ? j.tweetURL : '',
              author:{ name:j.user_name || '', handle: j.user_screen_name ? '@' + j.user_screen_name : '', avatar:isHttp(j.user_profile_image_url) ? j.user_profile_image_url : '' } };
   }
   async function resolveX(p){
@@ -6708,6 +6728,7 @@ const FLink = (function(){
         if(r.text) res.text = r.text;
         if(r.date) res.date = r.date;
         if(r.media.length) res.media = r.media;
+        if(r.links && r.links.length) res.links = r.links;
         if(r.author.name) res.author.name = r.author.name;
         if(r.author.handle) res.author.handle = r.author.handle;
         if(r.author.avatar) res.author.avatar = r.author.avatar;
@@ -6947,6 +6968,16 @@ const FLink = (function(){
     let au = meta('article:author', 'author');
     if(!au && ld.author) au = (Array.isArray(ld.author) ? ld.author[0] : ld.author).name || '';
     out.author = /^https?:/i.test(au) ? '' : au;
+    out.links = [];
+    try {
+      doc.querySelectorAll('a[href], iframe[src], [data-telegram-post]').forEach(el=>{
+        const h = el.getAttribute('href') || el.getAttribute('src') || '';
+        if(/(?:t\.me|telegram\.me|telegram\.dog)\//i.test(h)) out.links.push(absUrl(h, pageUrl));
+        const dp = el.getAttribute('data-telegram-post');
+        if(dp && /^[A-Za-z0-9_]+\/\d+$/.test(dp)) out.links.push('https://t.me/' + dp);
+      });
+      out.links = out.links.slice(0, 60);
+    } catch(e){}
     return out;
   }
   async function resolveGeneric(p){
@@ -6956,6 +6987,7 @@ const FLink = (function(){
       const o = parseOg(html, p.url);
       res.title = o.title;
       res.text = [o.title, o.description].filter(Boolean).join('\n');
+      if(o.links && o.links.length) res.links = o.links;
       res.site = o.site;
       if(o.date) res.date = o.date;
       if(o.author){ res.author.name = o.author; }
@@ -6994,6 +7026,7 @@ const FLink = (function(){
     }
     r.kind = p.kind;
     r.coords = extractCoords([r.title, r.text, (r.links || []).join(' ')].join('\n'));
+    try { r.tgLinks = (p.kind === 'telegram') ? [] : tgPostLinks([r.title, r.text, (r.links || []).join('\n')]); } catch(e){ r.tgLinks = []; }
     return r;
   }
 
@@ -7020,7 +7053,7 @@ const FLink = (function(){
   }
 
   return { parse, resolve, fetchImageBlob, extractCoords, titleFromText, isoLocal, snowflakeDate, platformLabel,
-           getJson, resolveThread:resolveXThread,
+           getJson, resolveThread:resolveXThread, tgPostLinks,
            proxies:{ get:getProxies, set:setProxies, defaults:DEFAULT_PROXIES },
            _t:{ fromFx, fromVx, fxPart, parseTelegramHtml, parseOg } };
 })();
@@ -23565,7 +23598,15 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
     if(edTab === 'events'){
       const t = res.title ? (FLink.titleFromText(res.title, 160) || res.title) : FLink.titleFromText(res.text);
       edPut('title', t, 'title', filled);
-      edPut('mainSrc', link, 'main source', filled);
+      /* TGSRC-v1: a Telegram post inside the link's content is the main source (the pasted link is then only where it was found) */
+      const tgm = (res.tgLinks && res.tgLinks[0]) || '';
+      if(tgm){
+        res.tgMain = tgm;
+        res.notes = (res.notes || []).concat('Main source: the Telegram post found in the link\'s content (' + tgm.replace(/^https:\/\//, '') + ')'
+          + (res.tgLinks.length > 1 ? ' — ' + (res.tgLinks.length - 1) + ' more Telegram link' + (res.tgLinks.length > 2 ? 's' : '') + ' in it: ' + res.tgLinks.slice(1, 4).map(u=> u.replace(/^https:\/\//, '')).join(', ') : '')
+          + '. The pasted link itself was not used as the main source.');
+      }
+      edPut('mainSrc', tgm || link, tgm ? 'main source (Telegram)' : 'main source', filled);
       if(res.coords) edPut('coord', res.coords[0] + ', ' + res.coords[1], 'coordinates', filled);
       if(mi && mi.videos) edPut('video', '1', 'video flag', filled);
       try { res.notes = (res.notes || []).concat(edUnitFill(res, filled)); } catch(e){}
@@ -23751,7 +23792,7 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
     const notes = [];
     const val = k=>{ const el = document.querySelector('#ed-form [data-k="' + k + '"]'); return el ? String(el.value).trim() : ''; };
     const a = res.author || {};
-    const hs = [a.handle, FUnit.urlHandle(res.url), FUnit.urlHandle(res.canonical)].filter(Boolean);
+    const hs = [a.handle, FUnit.urlHandle(res.url), FUnit.urlHandle(res.canonical), res.tgMain ? FUnit.urlHandle(res.tgMain) : ''].filter(Boolean);
     const social = !!(FUnit.urlHandle(res.url) || FUnit.urlHandle(res.canonical));
     let d = null;
     try {
@@ -26656,7 +26697,7 @@ function fsClose(){
 <script>
 /* PWA-v2: servis işçisi — yalnızca http(s) üzerinde (file:// ve DOWNLOAD SITE kopyasında devre dışı) */
 (function(){
-  var BUILD = '20261123-1100';
+  var BUILD = '20261123-1130';
   var live = ('serviceWorker' in navigator) && /^https?:$/.test(location.protocol);
   var reg = null, lastKick = 0;
   function ctl(){ return live ? navigator.serviceWorker.controller : null; }
