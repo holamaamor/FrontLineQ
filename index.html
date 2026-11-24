@@ -9283,6 +9283,18 @@ function flApplyAmbPatch(p){
     const d = (r.h && byHash.get(String(r.h))) || byND.get((r.name || '') + '|' + (r.date || ''));
     if(!d) return;
     let ch = false;
+    const F = (r.fix && typeof r.fix === 'object') ? r.fix : null;
+    if(F){
+      ['name','loc','oblast'].forEach(k=>{ const t = clean(F[k]).slice(0, 200); if(t && d[k] !== t){ d[k] = t; ch = true; } });
+      if(Array.isArray(F.coords) && F.coords.length === 2 && F.coords.every(n=> isFinite(+n) && n !== null && n !== '')){
+        const c = [+F.coords[0], +F.coords[1]];
+        if(!Array.isArray(d.coords) || d.coords[0] !== c[0] || d.coords[1] !== c[1]){ d.coords = c; ch = true; }
+      }
+      if(typeof F.note === 'string'){ const t = F.note.replace(/[<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 4000); if(t && d.note !== t){ d.note = t; ch = true; } }
+      const strip = u=> String(u || '').replace(/,$/, '');
+      if(Array.isArray(F.dropSources) && Array.isArray(d.sources)){ const bad = F.dropSources.map(strip), n0 = d.sources.length; d.sources = d.sources.filter(u=> bad.indexOf(strip(u)) < 0); if(d.sources.length !== n0) ch = true; }
+      if(Array.isArray(F.dropMedia) && Array.isArray(d.media)){ const bad = F.dropMedia.map(strip), n0 = d.media.length; d.media = d.media.filter(u=> bad.indexOf(strip(u)) < 0); if(d.media.length !== n0) ch = true; }
+    }
     const S = (r.set && typeof r.set === 'object') ? r.set : {};
     const UNITS = (typeof AMB_UNITS !== 'undefined') ? AMB_UNITS : {};
     if(S.unit && d.unit === 'NA' && !(d.coUnits || []).length && UNITS[S.unit] && S.unit !== 'NA'){ d.unit = S.unit; ch = true; }
@@ -26870,7 +26882,7 @@ function fsClose(){
 <script>
 /* PWA-v2: servis işçisi — yalnızca http(s) üzerinde (file:// ve DOWNLOAD SITE kopyasında devre dışı) */
 (function(){
-  var BUILD = '20261124-1840';
+  var BUILD = '20261124-2005';
   var live = ('serviceWorker' in navigator) && /^https?:$/.test(location.protocol);
   var reg = null, lastKick = 0;
   function ctl(){ return live ? navigator.serviceWorker.controller : null; }
