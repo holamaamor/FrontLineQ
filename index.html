@@ -1875,6 +1875,12 @@
      .fs-card .ev-ins{width:22px;height:22px;}
      .event-meta{gap:8px;}
   .event-geo{color:var(--crimson);font-size:9px;margin-top:6px;}
+  /* GEOGREEN-v1: GEOLOCATED label is green (all themes, panel + fullscreen); NO LOCATION stays grey */
+  .event-geo:not(.event-nogeo){color:#3fbf6e;}
+  #app[data-ui-theme="light"] .event-geo:not(.event-nogeo),
+  body[data-ui-theme="light"] .event-geo:not(.event-nogeo){color:#1c7c3e;}
+  body[data-ui-theme="tactical"] #fs-body .fs-card .event-geo:not(.event-nogeo),
+  #app[data-ui-theme="tactical"] .event-geo:not(.event-nogeo){color:#52d884;}
   .event-src{color:var(--gold);font-size:8.5px;margin-top:4px;letter-spacing:0.5px;opacity:0.8;}
   .event-type{
     display:inline-block;font-size:9px;padding:2px 6px;margin-top:8px;
@@ -9259,6 +9265,59 @@ function flApplyAuto(a){
   return did.length > 0;
 }
 
+/* AMBPATCH-v1 ------------------------------------------------------------------------------------------------
+   ambargo.json: fill-only enrichment of existing Ambargo records (see the rules in the patch header). Runs after data.json. */
+function flApplyAmbPatch(p){
+  if(!p || !Array.isArray(p.records) || typeof AMBARGO_DATA === 'undefined' || !Array.isArray(AMBARGO_DATA)) return 0;
+  const key = d => [d.name, d.date, (d.coords || []).map(n=> (+n).toFixed(6)).join(','), d.loc || ''].join('|');
+  const byHash = new Map(), byND = new Map();
+  AMBARGO_DATA.forEach(d=>{
+    try { byHash.set(flH(key(d)), d); } catch(e){}
+    const nd = (d.name || '') + '|' + (d.date || ''); if(!byND.has(nd)) byND.set(nd, d);
+  });
+  const clean = v=> String(v == null ? '' : v).replace(/[<>]/g, ' ').replace(/\s+/g, ' ').trim();
+  const okUrl = u=> /^https?:\/\/[^\s<>"']+$/i.test(String(u || '')) || /^data:(image|video)\//i.test(String(u || ''));
+  let touched = 0;
+  p.records.forEach(r=>{
+    if(!r || typeof r !== 'object') return;
+    const d = (r.h && byHash.get(String(r.h))) || byND.get((r.name || '') + '|' + (r.date || ''));
+    if(!d) return;
+    let ch = false;
+    const S = (r.set && typeof r.set === 'object') ? r.set : {};
+    const UNITS = (typeof AMB_UNITS !== 'undefined') ? AMB_UNITS : {};
+    if(S.unit && d.unit === 'NA' && !(d.coUnits || []).length && UNITS[S.unit] && S.unit !== 'NA'){ d.unit = S.unit; ch = true; }
+    if(Array.isArray(r.coUnits) && r.coUnits.length && (d.unit !== 'NA' || S.unit)){
+      const cu = Array.isArray(d.coUnits) ? d.coUnits : [];
+      r.coUnits.forEach(u=>{ if(UNITS[u] && u !== d.unit && cu.indexOf(u) < 0){ cu.push(u); ch = true; } });
+      if(cu.length) d.coUnits = cu;
+    }
+    if(S.method && /^unknown$/i.test(String(d.method || ''))){ d.method = clean(S.method).toUpperCase(); ch = true; }
+    if(S.weapon && (!d.weapon || /^(none|unknown)$/i.test(String(d.weapon).trim()))){ d.weapon = clean(S.weapon).slice(0, 120); ch = true; }
+    if(S.operation && !d.operation){ d.operation = clean(S.operation).slice(0, 80); ch = true; }
+    if(r.note){
+      const t = String(r.note).replace(/[<>]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 4000);
+      if(t && !String(d.note || '').includes(t)){ d.note = (String(d.note || '').replace(/\s*$/, '') + ' ' + t).trim(); ch = true; }
+    }
+    if(Array.isArray(r.media)){
+      const m = Array.isArray(d.media) ? d.media : [];
+      r.media.forEach(u=>{ if(okUrl(u) && m.indexOf(u) < 0){ m.push(u); ch = true; } });
+      if(m.length) d.media = m;
+    }
+    if(Array.isArray(r.sources)){
+      const m = Array.isArray(d.sources) ? d.sources : [];
+      r.sources.forEach(u=>{ if(okUrl(u) && m.indexOf(u) < 0){ m.push(u); ch = true; } });
+      if(m.length) d.sources = m;
+    }
+    if(ch) touched++;
+  });
+  if(touched){
+    try { if(typeof renderAmbargo === 'function' && typeof ambVisible === 'function' && typeof AMB_MONTHS !== 'undefined') renderAmbargo(); } catch(e){ console.warn('[FL] ambargo.json render', e); }
+    try { if(typeof renderAmbUnits === 'function') renderAmbUnits(); } catch(e){}
+    console.info('[FL] ambargo.json uygulandı: ' + touched + ' kayıt · ' + (p.updated || ''));
+  }
+  return touched;
+}
+
 function flLoadRemote(){
   if(location.protocol === 'file:'){ window.__flRemoteDone = true; return; }   /* yerel dosyada anlamsız */
   let custom = null;
@@ -9268,10 +9327,12 @@ function flLoadRemote(){
     : flFetchJson('data.json');
   const autoP = custom ? Promise.reject(new Error('custom data url')) : flFetchJson('auto.json');
   const designP = custom ? Promise.reject(new Error('custom data url')) : flFetchJson('design.json');
+  const ambP = custom ? Promise.reject(new Error('custom data url')) : flFetchJson('ambargo.json');
   Promise.all([ dataP.catch(err=>{ console.info('[FL] uzak veri yok veya okunamadı:', err.message); return null; }),
                 autoP.catch(err=>{ console.info('[FL] auto.json yok veya okunamadı:', err.message); return null; }),
-                designP.catch(err=>{ console.info('[FL] design.json yok veya okunamadı:', err.message); return null; }) ])
-    .then(([d, a, g])=>{
+                designP.catch(err=>{ console.info('[FL] design.json yok veya okunamadı:', err.message); return null; }),
+                ambP.catch(err=>{ console.info('[FL] ambargo.json yok veya okunamadı:', err.message); return null; }) ])
+    .then(([d, a, g, amb])=>{
       try {
         if(d && flApplyRemote(d)){
           const n = (d.events||[]).length;
@@ -9280,6 +9341,7 @@ function flLoadRemote(){
         }
       } catch(e){ console.warn('[FL] data.json uygulanamadı', e); }
       try { if(a) flApplyAuto(a); } catch(e){ console.warn('[FL] auto.json uygulanamadı', e); }
+      try { if(amb) flApplyAmbPatch(amb); } catch(e){ console.warn('[FL] ambargo.json uygulanamadı', e); }
       try { if(g && window.FLDesign) console.info('[FL] design.json: ' + window.FLDesign.sync(g)); } catch(e){ console.warn('[FL] design.json uygulanamadı', e); }
     })
     .then(()=>{ window.__flRemoteDone = true; });
@@ -26808,7 +26870,7 @@ function fsClose(){
 <script>
 /* PWA-v2: servis işçisi — yalnızca http(s) üzerinde (file:// ve DOWNLOAD SITE kopyasında devre dışı) */
 (function(){
-  var BUILD = '20261123-1950';
+  var BUILD = '20261124-1840';
   var live = ('serviceWorker' in navigator) && /^https?:$/.test(location.protocol);
   var reg = null, lastKick = 0;
   function ctl(){ return live ? navigator.serviceWorker.controller : null; }
