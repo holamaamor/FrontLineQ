@@ -1138,6 +1138,10 @@
 /* ---------- CARGO200 (v2): numbers, two iStories-style maps, leak figures ---------- */
   #skull-view{ --c2-bg:#0d0d0e;--c2-panel:rgba(19,19,20,.95);--c2-line:#2b2a28;--c2-line2:#3a3936;--c2-text:#ebe7df;--c2-mut:#a7a299;--c2-yel:#d8b648;--c2-red:#d9433b;--c2-redt:#c9403a;
     background:var(--c2-bg);color:var(--c2-text);font-family:'Inter',system-ui,sans-serif; }
+  /* dark background video behind the CARGO200 page */
+  #skull-view .c2-bgv{ position:fixed !important;inset:0;width:100%;height:100%;object-fit:cover;z-index:0 !important;opacity:.2;pointer-events:none;filter:grayscale(.35); }
+  #skull-view .c2-wrap{ position:relative;z-index:1; }
+  @media (prefers-reduced-motion:reduce){ #skull-view .c2-bgv{ display:none; } }
   #skull-view .c2-wrap{ max-width:1400px;margin:0 auto;padding:48px 40px 72px;display:flex;flex-direction:column;gap:56px; }
   #skull-view .c2-eyebrow{ font:600 12px 'Inter',system-ui,sans-serif;letter-spacing:.14em;color:var(--c2-mut);text-transform:uppercase; }
   #skull-view .c2-eyebrow.y{ color:var(--c2-yel); }
@@ -22223,6 +22227,17 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
     appEl2.classList.toggle('view-losses', view === 'losses');
     appEl2.classList.toggle('view-desk', view === 'desk');
     appEl2.classList.toggle('view-skull', view === 'skull');
+    /* dark background video of the CARGO200 page: made on first visit and added as the LAST child, so the design editor's saved element paths do not shift */
+    try {
+      const sv = document.getElementById('skull-view');
+      let bg = sv && sv.querySelector(':scope > .c2-bgv');
+      if(!bg && sv && view === 'skull'){
+        bg = document.createElement('video');
+        bg.className = 'c2-bgv'; bg.muted = true; bg.loop = true; bg.playsInline = true; bg.setAttribute('playsinline', ''); bg.setAttribute('aria-hidden', 'true');
+        bg.src = 'c200-bg.mp4'; sv.appendChild(bg);
+      }
+      if(bg){ if(view === 'skull'){ const pr = bg.play(); if(pr && pr.catch) pr.catch(() => {}); } else bg.pause(); }
+    } catch(err){}
     appEl2.classList.toggle('view-ambargo', view === 'ambargo');
     /* Bir haritanın hazırlanması hata verirse sekme geçişi engellenmesin. */
     if(view === 'map'){
@@ -27613,7 +27628,7 @@ function fsClose(){
 <script>
 /* PWA-v2: servis işçisi — yalnızca http(s) üzerinde (file:// ve DOWNLOAD SITE kopyasında devre dışı) */
 (function(){
-  var BUILD = '20261127-0035';
+  var BUILD = '20261127-0240';
   var live = ('serviceWorker' in navigator) && /^https?:$/.test(location.protocol);
   var reg = null, lastKick = 0;
   function ctl(){ return live ? navigator.serviceWorker.controller : null; }
