@@ -23721,11 +23721,24 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
     return FDTag.suggest(tx ? tx.value : '', { source: /^@/.test(h) ? '' : h });
   }
 
+  /* EMOJI-v1: titles taken from a link carry no emojis (pictographs, flags, skin tones, ZWJ sequences, keycaps).
+     Text symbols such as © ™ → ‼ stay. A separator left at the start (“🔥 | ...”) goes with the emoji. */
+  const ED_EMOJI_RE = /(?:\p{Extended_Pictographic}️)|[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{2300}-\u{23FF}]|\p{Emoji_Presentation}|[\u{1F1E6}-\u{1F1FF}\u{1F3FB}-\u{1F3FF}\u{E0020}-\u{E007F}‍︎️⃣]/gu;
+  function edStripEmoji(s){
+    const src = String(s == null ? '' : s);
+    const out = src.replace(/[0-9#*]️?⃣/g, '').replace(ED_EMOJI_RE, '');
+    if(out === src) return src;
+    return out.replace(/[ \t ]{2,}/g, ' ').replace(/^[\s|:·•\-–—]+/, '').trim();
+  }
+
   function edApplyResult(res, filled, mi){
     const link = res.canonical || res.url || '';
     edPut('date', FLink.isoLocal(res.date), 'date', filled);
     if(edTab === 'events'){
-      const t = res.title ? (FLink.titleFromText(res.title, 160) || res.title) : FLink.titleFromText(res.text);
+      /* EMOJI-v1: emojis are dropped from the title (the Text and the source keep them) */
+      const ctl = edStripEmoji(res.title), ctx = edStripEmoji(res.text);
+      const t = ctl ? (FLink.titleFromText(ctl, 160) || ctl) : FLink.titleFromText(ctx);
+      if((res.title && ctl !== res.title) || (!ctl && res.text && ctx !== res.text)) res.notes = (res.notes || []).concat('Emojis were removed from the title.');
       edPut('title', t, 'title', filled);
       /* TGSRC-v1: a Telegram post inside the link's content is the main source (the pasted link is then only where it was found) */
       const tgm = (res.tgLinks && res.tgLinks[0]) || '';
