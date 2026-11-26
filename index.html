@@ -1204,7 +1204,7 @@
   #skull-view .c2-legend small{ font-size:12px;line-height:1.4;color:var(--c2-mut); }
   #skull-view .c2-attr{ position:absolute;right:8px;bottom:6px;z-index:3;max-width:70%;font-size:11px;line-height:1.35;color:var(--c2-mut);background:rgba(19,19,20,.82);padding:2px 6px;border-radius:4px; }
   #skull-view .c2-attr a{ color:var(--c2-mut); }
-  #skull-view .c2-result{ position:absolute;right:16px;top:80px;z-index:4;box-sizing:border-box;width:380px;max-width:calc(100% - 32px);max-height:calc(100% - 150px);overflow:auto;padding:20px;display:none;flex-direction:column;gap:16px; }
+  #skull-view .c2-result{ position:absolute;right:16px;top:var(--c2-rt,80px);z-index:4;box-sizing:border-box;width:380px;max-width:calc(100% - 32px);max-height:calc(100% - var(--c2-rt,80px) - 70px);overflow:auto;padding:20px;display:none;flex-direction:column;gap:16px; }
   #skull-view .c2-result.on{ display:flex; }
   #skull-view .c2-r-top{ display:flex;justify-content:space-between;align-items:flex-start;gap:12px; }
   #skull-view .c2-r-area{ font-family:'Newsreader',Georgia,serif;font-size:30px;line-height:1.1;color:#fff; }
@@ -1272,7 +1272,21 @@
   #skull-view .c2-time-src{ grid-area:src; }
   #skull-view .c2-time[hidden]{ display:none; }
   #skull-view .c2-time.c2-out{ position:sticky;bottom:12px;z-index:30;width:auto;margin-top:-6px;box-shadow:0 -8px 26px rgba(0,0,0,.5); }
-  #skull-view .c2-time:not(.c2-out){ position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:5;width:min(640px,calc(100% - 32px)); }
+  #skull-view .c2-time:not(.c2-out){ position:absolute;left:50%;bottom:34px;transform:translateX(-50%);z-index:5;width:min(820px,calc(100% - 32px)); }
+  #skull-view .c2-view.c2-time-view{ grid-area:view;display:none;min-width:260px;border-bottom:0;padding-bottom:0;align-self:start; }
+  /* full screen: the date on the left, the losses in view on the right, then the slider and the step buttons */
+  #skull-view .c2-map.c2-fs .c2-time:not(.c2-out){ grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"d view" "range range" "ticks ticks" "steps main" "src src"; }
+  #skull-view .c2-map.c2-fs .c2-time:not(.c2-out) .c2-view.c2-time-view{ display:grid; }
+  #skull-view .c2-map.c2-fs .c2-time-steps .c2-btn{ flex:1 1 0;padding:0 4px; }
+  #skull-view .c2-map.c2-fs.has-time .c2-legend .c2-view:not(.c2-time-view){ display:none; }
+  @media (min-width:761px){ #skull-view .c2-map.c2-fs.has-time .c2-result{ max-height:calc(100% - var(--c2-rt,80px) - 44px - var(--c2-tp,0px)); } }
+  @media (min-width:1101px){ #skull-view .c2-map.c2-fs .c2-time:not(.c2-out){ left:352px;right:84px;transform:none;width:auto;max-width:820px; } }
+  #skull-view .c2-time.c2-narrow{ grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"d main" "range range" "ticks ticks" "steps steps" "src src";padding:12px 14px 12px;gap:4px 10px; }
+  #skull-view .c2-time.c2-narrow .c2-time-date{ font-size:24px; }
+  #skull-view .c2-time.c2-narrow .c2-time-d .c2-eyebrow{ font-size:10.5px; }
+  #skull-view .c2-time.c2-narrow .c2-time-steps .c2-btn{ flex:1 1 0;padding:0 2px;font-size:12.5px; }
+  #skull-view .c2-time.c2-narrow .c2-time-src{ font-size:11.5px;line-height:1.4; }
+  @media (max-height:560px){ #skull-view .c2-map.c2-fs.has-time .c2-draw, #skull-view .c2-map.c2-fs.has-time .c2-ticks{ display:none; } #skull-view .c2-map.c2-fs .c2-time:not(.c2-out){ padding-top:10px;padding-bottom:10px; } #skull-view .c2-map.c2-fs .c2-time-date{ font-size:24px; } }
   #skull-view .c2-time-date{ font-family:'Newsreader',Georgia,serif;font-size:32px;line-height:1.1;color:#fff;font-variant-numeric:tabular-nums; }
   #skull-view .c2-time .c2-btn{ height:40px;padding:0 12px;font-size:13px;justify-content:center; }
   #skull-view .c2-time .c2-btn[data-act="fplay"]{ min-width:84px; }
@@ -1287,6 +1301,11 @@
   #skull-view .c2-time-src{ font-size:12px;line-height:1.45;color:var(--c2-mut); }
   #skull-view .c2-time-src.sch{ color:#d8b648; }
   #skull-view .c2-legend div[hidden]{ display:none; }
+  #skull-view .c2-view{ display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px 16px;align-items:baseline;padding-bottom:10px;border-bottom:1px solid var(--c2-line2); }
+  #skull-view .c2-vh{ font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--c2-mut);text-align:right; }
+  #skull-view .c2-vl{ display:flex;align-items:center;gap:8px;font-size:13px;color:#d9d5cc; }
+  #skull-view .c2-vl i{ width:10px;height:10px;border-radius:50%;flex:none; }
+  #skull-view .c2-view b{ font-family:'Newsreader',Georgia,serif;font-weight:400;font-size:18px;line-height:1.2;color:#fff;text-align:right;font-variant-numeric:tabular-nums; }
   #skull-view .c2-years{ display:flex;flex-direction:column;gap:14px;max-width:1000px;margin-top:8px;padding-top:20px;border-top:1px solid var(--c2-line2); }
   #skull-view .c2-years .c2-bars{ gap:14px; }
   #skull-view .c2-years .c2-bar-l span{ font-size:13px; }
@@ -1328,6 +1347,7 @@
   @media (max-width:760px){
     #skull-view .c2-time{ grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"d main" "range range" "ticks ticks" "steps steps" "src src";padding:12px 14px 12px;gap:4px 10px; }
     #skull-view .c2-time.c2-out{ position:static;box-shadow:none; }
+    #skull-view .c2-map.c2-fs .c2-time:not(.c2-out){ grid-template-areas:"d main" "view view" "range range" "ticks ticks" "steps steps" "src src"; }
     #skull-view .c2-time-date{ font-size:24px; }
     #skull-view .c2-time-d .c2-eyebrow{ font-size:10.5px; }
     #skull-view .c2-time .c2-btn{ height:40px;padding:0 10px; }
@@ -1361,6 +1381,8 @@
     #skull-view .c2-draw-act .c2-btn{ flex:none;height:40px;padding:0 16px; }
     #skull-view .c2-zoom{ right:10px;bottom:30px; }
     #skull-view .c2-legend{ left:10px;bottom:40px;width:auto;max-width:calc(100% - 80px);padding:8px 10px;font-size:12px;gap:6px; }
+    #skull-view .c2-view{ gap:4px 12px; }
+    #skull-view .c2-view b{ font-size:16px; }
     #skull-view .c2-legend.c2-out, #skull-view .c2-result.c2-out{ position:static;box-sizing:border-box;width:auto;max-width:none;max-height:none;overflow:visible; }
     #skull-view .c2-legend.c2-out{ padding:12px 14px;font-size:13px;gap:10px;margin-top:-6px; }
     #skull-view .c2-result.c2-out{ padding:18px;margin-top:-6px; }
@@ -16591,7 +16613,9 @@ const C2MAP = (function(){
       + '<button type="button" class="c2-btn" data-act="list" aria-expanded="false">' + ICON.list + '<span class="c2-btn-t">List</span></button>'
       + '<button type="button" class="c2-btn" data-act="about">' + ICON.info + '<span class="c2-btn-t">About the map</span></button></div>'
       + '<div class="c2-panel c2-zoom"><button type="button" class="c2-sq" data-act="zin" aria-label="Zoom in">' + ICON.plus + '</button><i></i><button type="button" class="c2-sq" data-act="zout" aria-label="Zoom out">' + ICON.minus + '</button></div>'
-      + '<div class="c2-panel c2-legend"><div>' + ICON.legRes + '<span>Where the dead lived, sized by number</span></div><div>' + ICON.legDeath + '<span>Place of death in Ukraine</span></div>'
+      + '<div class="c2-panel c2-legend"><span class="c2-view"><span class="c2-eyebrow">In view</span><span class="c2-vh">Estimate</span><span class="c2-vh">Rosstat leak</span>'
+      + '<span class="c2-vl"><i style="background:' + YEL + '"></i>Lived here</span><b data-v="el">…</b><b data-v="rl">…</b>'
+      + '<span class="c2-vl"><i style="background:' + RED + '"></i>Died here</span><b data-v="ed">…</b><b data-v="rd">…</b></span><div>' + ICON.legRes + '<span>Where the dead lived, sized by number</span></div><div>' + ICON.legDeath + '<span>Place of death in Ukraine</span></div>'
       + '<div class="c2-leg-front" hidden><svg width="34" height="14" viewBox="0 0 34 14" aria-hidden="true"><rect x="1" y="1" width="32" height="12" fill="#c98a2c" fill-opacity=".25" stroke="#e6b85c" stroke-width="1.5"></rect></svg><span>Territory held by Russia</span></div></div>'
       + '<div class="c2-panel c2-time" hidden><div class="c2-time-d"><div class="c2-eyebrow">Front line · territory held by Russia</div><div class="c2-time-date" aria-live="polite">—</div></div>'
       + '<div class="c2-time-steps"><button type="button" class="c2-btn" data-fstep="-30" aria-label="30 days back">−30 d</button><button type="button" class="c2-btn" data-fstep="-7" aria-label="7 days back">−7 d</button><button type="button" class="c2-btn" data-fstep="-1" aria-label="1 day back">−1 d</button>'
@@ -16606,6 +16630,9 @@ const C2MAP = (function(){
     while(chrome.firstChild) wrap.appendChild(chrome.firstChild);
     const hintEl = q('.c2-draw-hint'), actEl = q('.c2-draw-act'), resEl = q('.c2-result'), attrEl = q('.c2-attr'), legEl = q('.c2-legend'), timeEl = q('.c2-time');
     const rangeEl = timeEl.querySelector('.c2-range'), dateEl = timeEl.querySelector('.c2-time-date'), srcEl = timeEl.querySelector('.c2-time-src'), ticksEl = timeEl.querySelector('.c2-ticks');
+    const viewEl = legEl.querySelector('.c2-view');
+    /* in full screen the same numbers sit in the date panel (top right), where the legend is hidden or crowded */
+    const timeViewEl = viewEl.cloneNode(true); timeViewEl.classList.add('c2-time-view'); timeEl.querySelector('.c2-time-d').after(timeViewEl);
     const legFrontEl = legEl.querySelector('.c2-leg-front'), playEl = timeEl.querySelector('[data-act="fplay"]'), frontBtn = q('[data-act="front"]');
     /* on a phone the legend and the numbers sit below the map (as in the approved design); in full screen they go back on top of it */
     function place(){
@@ -16618,6 +16645,12 @@ const C2MAP = (function(){
     }
     if(mq.addEventListener) mq.addEventListener('change', place); else if(mq.addListener) mq.addListener(place);
     place();
+    /* the date panel switches to its compact two-row layout whenever it is too narrow for one row (a floating panel in full screen, a phone) */
+    /* the result box starts under the toolbar, which wraps onto a second row on medium screens */
+    const barEl = q('.c2-bar');
+    function barSync(){ wrap.style.setProperty('--c2-rt', Math.max(80, barEl.offsetTop + barEl.offsetHeight + 12) + 'px'); }
+    if(window.ResizeObserver){ const ro = new ResizeObserver(barSync); ro.observe(barEl); ro.observe(wrap); } barSync();
+    if(window.ResizeObserver) new ResizeObserver(() => { const w = timeEl.clientWidth; if(w) timeEl.classList.toggle('c2-narrow', w < 740); wrap.style.setProperty('--c2-tp', (S.fs && !timeEl.hidden ? timeEl.offsetHeight : 0) + 'px'); }).observe(timeEl);
     function setAttr(){ attrEl.innerHTML = ATTR[S.base] + (S.front.on ? FRONT_ATTR : ''); }
     setAttr();
 
@@ -16679,6 +16712,7 @@ const C2MAP = (function(){
       S.ready = true;
       if(S.base === 'sat') setBase('sat');
       if(S.front.on) frontOn(true);
+      ensureModel(); renderView();
     }
 
     /* ----- base map ----- */
@@ -16811,6 +16845,39 @@ const C2MAP = (function(){
       }
     }
 
+    /* the modelled points (model.json) are only counted, never drawn: loaded in the background once the map is up */
+    function ensureModel(){
+      if(S.M || S.mState) return;
+      S.mState = 'loading';
+      loadModel().then(m => { S.M = m; S.mState = 'ok'; if(S.ring) result(); updateView(); })
+        .catch(() => { S.mState = 'fail'; if(S.ring) result(); updateView(); });
+    }
+    const estTotal = (real, mod) => mod == null ? (S.mState === 'fail' ? 'n/a' : '…') : (mod ? approx(real + mod) : fmt(real));
+    /* what is inside the part of the map on screen: the records and the estimate, live while the map moves */
+    function rectCount(lon, lat, cnt, bb){
+      let sum = 0;
+      for(let i = 0; i < cnt.length; i++){
+        const x = lon[i], y = lat[i];
+        if(x >= bb[0] && x <= bb[2] && y >= bb[1] && y <= bb[3]) sum += cnt[i];
+      }
+      return sum;
+    }
+    let vraf = 0;
+    function updateView(){
+      if(vraf) return;
+      vraf = requestAnimationFrame(() => { vraf = 0; renderView(); });
+    }
+    function renderView(){
+      if(!S.ready || !S.D) return;
+      const b = S.map.getBounds(), bb = [b.getWest(), b.getSouth(), b.getEast(), b.getNorth()], D = S.D;
+      const lived = rectCount(D.rLon, D.rLat, D.rC, bb), died = rectCount(D.pLon, D.pLat, D.pC, bb);
+      let ml = null, md = null;
+      if(S.M){ ml = rectCount(S.M.res.lon, S.M.res.lat, S.M.res.c, bb); md = rectCount(S.M.death.lon, S.M.death.lat, S.M.death.c, bb); }
+      const set = (k, v) => { for(const box of [viewEl, timeViewEl]){ const e = box.querySelector('[data-v="' + k + '"]'); if(e) e.textContent = v; } };
+      set('rl', fmt(lived)); set('rd', fmt(died)); set('el', estTotal(lived, ml)); set('ed', estTotal(died, md));
+      S.view = { lived, died, mLived: ml, mDied: md, bb };
+    }
+
     /* the numbers for the selected area; real data and the model are counted apart */
     let raf = 0;
     function result(){
@@ -16823,15 +16890,11 @@ const C2MAP = (function(){
       const bb = bbox(ring);
       const lived = countIn(ring, bb, D.rLon, D.rLat, D.rC), died = countIn(ring, bb, D.pLon, D.pLat, D.pC);
       const area = ringArea(ring);
-      /* the modelled points (model.json, loaded on the first area) are only counted here, not drawn on the map */
       let ml = null, md = null;
       if(S.M){
         ml = countIn(ring, bb, S.M.res.lon, S.M.res.lat, S.M.res.c); md = countIn(ring, bb, S.M.death.lon, S.M.death.lat, S.M.death.c);
-      } else if(!S.mState){
-        S.mState = 'loading';
-        loadModel().then(m => { S.M = m; S.mState = 'ok'; if(S.ring) result(); }).catch(() => { S.mState = 'fail'; if(S.ring) result(); });
-      }
-      const total = (real, mod) => mod == null ? (S.mState === 'fail' ? 'n/a' : '…') : (mod ? approx(real + mod) : fmt(real));
+      } else ensureModel();
+      const total = estTotal;
       const estSub = (real, mod, none) => mod == null ? (S.mState === 'fail' ? 'The estimate could not be loaded' : 'Loading the estimate…')
         : (real + mod ? fmt(real) + ' records + ' + (mod ? approx(mod) : '0') + ' modelled' : none);
       const row = (col, label, val, sub) => '<div class="c2-r-row"><span class="c2-dot" style="background:' + col + '"></span><div class="c2-r-main"><div class="c2-r-line"><span>' + label + '</span><b>' + val + '</b></div>'
@@ -16910,6 +16973,7 @@ const C2MAP = (function(){
         + '<h3>About the map</h3>'
         + '<h4>What the circles are</h4><p>Yellow circles are the settlements where the dead lived, sized by the number of people. Red circles are the places of death in Ukraine, also sized by number. Both come from the leaked Rosstat death-certificate database, placed on the map by <a href="https://istories.media/war-map/regions/" target="_blank" rel="noopener">iStories</a>. The leak is unverified.</p>'
         + '<h4>The estimate</h4><p>The area panel adds points up to the estimate of about ' + fmt(SKULL_DATA.leakEstimate.value) + ' (Meduza and Mediazona, 23 November 2026) to the records. They are spread in proportion to the located data. They are a model of where the deaths probably are, not records of individual places, and they are not drawn on the map. The method is stored with the data.</p>'
+        + '<h4>In view</h4><p>The box at the bottom left counts what is inside the part of the map on screen, in the same two ways: the estimate (records plus modelled points) and the records of the Rosstat leak. It follows the map as you move and zoom. “Lived here” counts home settlements in Russia only.</p>'
         + '<h4>Counting in an area</h4><p>Draw a polygon, box or circle. The top block is the estimate for the area (located records plus modelled points, scaled to about ' + fmt(SKULL_DATA.leakEstimate.value) + '). The bottom block is only what the Rosstat leak names. “Lived here” counts home settlements, which the data holds for Russia only, so an area in Ukraine shows none. “Died here” counts the located places of death.</p>'
         + '<h4>Limits</h4><p>The latest months are incomplete because deaths are registered with a lag.' + (hid ? ' The source marks ' + fmt(hid.n) + ' deaths at ' + fmt(hid.places) + ' places as hidden, so they are not on the map.' : '') + ' Deaths registered without a named place are not on the map.</p>'
         + '<h4>The front line</h4><p>The shaded area is the territory held by Russia on the chosen date, with its edge as a line. From 8 July 2024 it is the daily DeepState map (as archived by <a href="https://github.com/cyterat/deepstate-map-data" target="_blank" rel="noopener">cyterat/deepstate-map-data</a>), simplified to about 200 metres. Earlier dates are schematic: frames redrawn from ISW assessments by <a href="https://github.com/longlinecode/russo-ukrainian-front-daily" target="_blank" rel="noopener">longlinecode/russo-ukrainian-front-daily</a>, accurate to about 5 to 10 km and moving in steps, so a date shows the nearest earlier frame. Crimea and the territory held before 24 February 2022 are included.</p>'
@@ -17038,6 +17102,7 @@ const C2MAP = (function(){
         if(f.length) popup(e.lngLat, featHtml(f[0])); else if(S.popup){ S.popup.remove(); S.popup = null; }
       });
       map.on('dblclick', e => { if(S.tool === 'polygon'){ e.preventDefault(); finishPolygon(); } });
+      map.on('move', updateView);
       map.on('mousemove', e => {
         if(S.tool){ onMove(e); return; }
         map.getCanvas().style.cursor = hit(e.point).length ? 'pointer' : '';
@@ -27501,7 +27566,7 @@ function fsClose(){
 <script>
 /* PWA-v2: servis işçisi — yalnızca http(s) üzerinde (file:// ve DOWNLOAD SITE kopyasında devre dışı) */
 (function(){
-  var BUILD = '20261126-1955';
+  var BUILD = '20261126-2010';
   var live = ('serviceWorker' in navigator) && /^https?:$/.test(location.protocol);
   var reg = null, lastKick = 0;
   function ctl(){ return live ? navigator.serviceWorker.controller : null; }
