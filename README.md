@@ -1,14 +1,14 @@
 # FrontLineQ
 
-Frontlines — single-file HTML OSINT site (PWA), hosted on Netlify.
+Frontlines — single-file HTML OSINT site (PWA), published from GitHub (this repo's `main`).
 
 - `index.html` — the whole site
 - `sw.js`, `manifest.webmanifest`, icons — offline / installable app
 - `data.json`, `auto.json` — copies of the data shipped with the site (fallback only)
-- `_headers`, `netlify.toml` — Netlify settings (no build step)
+- `_headers`, `netlify.toml` — legacy Netlify settings, no longer used (no build step)
 
 The live data is NOT read from here but from the separate repo **holamaamor/frontlineq-data**
 (`data.json` written by the editor's PUBLISH button, `auto.json` written by the daily scheduled task).
 
-**Every push to `main` is a Netlify production deploy and costs 15 of the 300 free monthly credits.**
-Push to this repo only when the site code itself changes; data updates go to `frontlineq-data`.
+Work happens only through GitHub: the site is published from `main` of this repo.
+Push to this repo when the site code itself changes; data updates go to `frontlineq-data`.
