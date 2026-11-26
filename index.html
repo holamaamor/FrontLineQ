@@ -1415,6 +1415,10 @@
   }
   #intro.leaving{opacity:0;transform:scale(1.04);pointer-events:none;}
 
+  .intro-video{ position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:1;opacity:.82;pointer-events:none;background:#05060a; }
+  .intro-video-shade{ position:absolute;inset:0;z-index:2;pointer-events:none;
+    background:radial-gradient(ellipse at 50% 50%, rgba(5,6,10,.55) 0%, rgba(5,6,10,.25) 55%, rgba(5,6,10,.6) 100%); }
+  @media (prefers-reduced-motion:reduce){ .intro-video{ display:none; } #intro{ background:#05060a url(intro-poster.jpg) center/cover no-repeat; } }
   .intro-terrain{
     position:absolute;inset:0;opacity:0.35;z-index:1;
     background-image:
@@ -4877,15 +4881,14 @@
   <div class="intro-letterbox top"></div>
   <div class="intro-letterbox bottom"></div>
 
-  <div class="intro-terrain"></div>
+  <video class="intro-video" autoplay muted loop playsinline preload="auto" poster="intro-poster.jpg" aria-hidden="true">
+    <source src="intro-m.mp4" type="video/mp4" media="(max-width:760px)">
+    <source src="intro.mp4" type="video/mp4">
+  </video>
+  <div class="intro-video-shade"></div>
   <div class="intro-smoke"></div>
   <div class="intro-flash f1"></div>
   <div class="intro-flash f2"></div>
-  <div class="intro-radar-wrap">
-    <div class="intro-radar-grid"></div>
-    <div class="intro-radar"></div>
-    <div class="intro-vhs"></div>
-  </div>
   <div class="intro-grain"></div>
   <div class="intro-scanlines-full"></div>
   <div class="intro-lens-blur"></div>
@@ -4893,17 +4896,6 @@
   <div class="intro-lens-edge"></div>
   <div id="intro-glitch-layer"></div>
   <div id="intro-embers"></div>
-
-  <div class="hud-reticle">
-    <svg viewBox="0 0 200 200">
-      <circle cx="100" cy="100" r="70" fill="none" stroke="currentColor" stroke-width="1"/>
-      <circle cx="100" cy="100" r="42" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="4 6"/>
-      <line x1="100" y1="6" x2="100" y2="34" stroke="currentColor" stroke-width="1.5"/>
-      <line x1="100" y1="166" x2="100" y2="194" stroke="currentColor" stroke-width="1.5"/>
-      <line x1="6" y1="100" x2="34" y2="100" stroke="currentColor" stroke-width="1.5"/>
-      <line x1="166" y1="100" x2="194" y2="100" stroke="currentColor" stroke-width="1.5"/>
-    </svg>
-  </div>
 
   <div class="hud-layer">
     <div class="hud-item hud-tl">
@@ -5682,9 +5674,11 @@
   function enterMap(){
     introEl.classList.add('leaving');
     appEl.classList.add('revealed');
+    const iv = introEl.querySelector('.intro-video');
     document.body.style.overflow = 'hidden';
     setTimeout(()=>{
       introEl.style.display = 'none';
+      if(iv){ try { iv.pause(); iv.removeAttribute('src'); iv.querySelectorAll('source').forEach(s => s.remove()); iv.load(); } catch(e){} }
       try {
         if(typeof map !== 'undefined' && map && map.invalidateSize) map.invalidateSize();
         if(typeof applyFilters === 'function') applyFilters();
@@ -13308,10 +13302,17 @@ function calStatus(){
   el.innerHTML = `<b>${n}</b> records · ${activeDate}`;
 }
 
+function calLastDays(days){
+  const f = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  const to = new Date(), from = new Date(); from.setDate(from.getDate() - days + 1);
+  return { from: f(from), to: f(to), range: f(from) + '..' + f(to) };
+}
 function calQuickState(){
   document.querySelectorAll('#cal-quick .cq').forEach(q=>{
+    const m = q.dataset.q;
     q.classList.toggle('on',
-      (q.dataset.q === 'all' && (!activeDate || activeDate === 'all')));
+      (m === 'all' && (!activeDate || activeDate === 'all')) ||
+      ((m === '7' || m === '30') && activeDate === calLastDays(+m).range));
   });
 }
 
@@ -13411,17 +13412,15 @@ function calGoto(dateStr){
         if(ds.length){ calGoto(ds[ds.length-1]); setActiveDate(ds[ds.length-1]); }
         return;
       }
-      const days = parseInt(mode, 10);
-      const to = new Date();
-      const from = new Date(); from.setDate(from.getDate() - days + 1);
-      const f = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0')
-                   + '-' + String(d.getDate()).padStart(2,'0');
-      calGoto(f(to));
-      setActiveDate(f(from) + '..' + f(to));
+      const r = calLastDays(parseInt(mode, 10));
+      calGoto(r.to);
+      setActiveDate(r.range);
     });
   });
 
   calRender();
+  /* the map opens on the last 7 days */
+  try { const r = calLastDays(7); calGoto(r.to); setActiveDate(r.range); } catch(err){ console.warn('[FL] default 7 days', err); }
 })();
 
 const themeToggleEl = document.getElementById('theme-toggle');
@@ -16626,6 +16625,7 @@ const C2MAP = (function(){
   const ATTR = {
     dark:'<a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> © <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">OpenMapTiles</a> · Data © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> · Data: iStories',
     sat:'Imagery © Esri, Maxar, Earthstar Geographics · © OpenStreetMap contributors · Data: iStories',
+    black:'Data: iStories',
   };
 
   function create(wrap){
@@ -16644,7 +16644,7 @@ const C2MAP = (function(){
       + '<div class="c2-draw-row"><button type="button" class="c2-btn" data-tool="polygon">' + ICON.poly + '<span>Polygon</span></button><button type="button" class="c2-btn" data-tool="box">' + ICON.box + '<span>Box</span></button><button type="button" class="c2-btn" data-tool="circle">' + ICON.circ + '<span>Circle</span></button></div>'
       + '<div class="c2-draw-hint">' + hintIdle + '</div>'
       + '<div class="c2-draw-act"><button type="button" class="c2-btn" data-act="finish">Finish shape</button><button type="button" class="c2-btn" data-act="cancel">Cancel</button></div></div>'
-      + '<div class="c2-bar"><div class="c2-panel c2-seg"><button type="button" class="c2-btn on" data-base="dark">Dark</button><button type="button" class="c2-btn" data-base="sat">Satellite</button></div>'
+      + '<div class="c2-bar"><div class="c2-panel c2-seg"><button type="button" class="c2-btn on" data-base="dark">Dark</button><button type="button" class="c2-btn" data-base="sat">Satellite</button><button type="button" class="c2-btn" data-base="black" title="Plain black, no map">Black</button></div>'
       + '<button type="button" class="c2-btn c2-m-only" data-act="drawtoggle" aria-expanded="false" aria-label="Draw an area to count" title="Draw an area to count">' + ICON.poly + '<span>Draw</span></button>'
       + '<button type="button" class="c2-btn" data-act="front" aria-pressed="false" aria-label="Front line by date" title="Front line by date">' + ICON.front + '<span class="c2-btn-t">Front line</span></button>'
       + '<button type="button" class="c2-btn" data-act="fs" aria-pressed="false">' + ICON.full + '<span class="c2-btn-t">Full screen</span></button>'
@@ -16736,6 +16736,8 @@ const C2MAP = (function(){
       map.addSource('c2-sat', { type:'raster', tiles:[SAT_TILES], tileSize:256, maxzoom:17 });
       map.addLayer({ id:'c2-sat', type:'raster', source:'c2-sat', layout:{ visibility:'none' }, paint:{ 'raster-brightness-max':0.8, 'raster-saturation':-0.15, 'raster-fade-duration':0 } }, bound && bound.id);
       const before = label && label.id;
+      /* plain black: covers the base map under our own layers (labels of the base map are switched off too) */
+      map.addLayer({ id:'c2-black', type:'background', layout:{ visibility:'none' }, paint:{ 'background-color':'#000' } }, before);
       map.addSource('c2-front', { type:'geojson', data:{ type:'FeatureCollection', features:[] } });
       map.addLayer({ id:'c2-front-fill', type:'fill', source:'c2-front', layout:{ visibility:'none' }, paint:{ 'fill-color':'#c98a2c', 'fill-opacity':['case', ['==', ['get', 's'], 1], 0.09, 0.14] } }, before);
       map.addLayer({ id:'c2-front-line', type:'line', source:'c2-front', filter:['==', ['get', 's'], 0], layout:{ visibility:'none', 'line-join':'round' }, paint:{ 'line-color':'#e6b85c', 'line-width':['interpolate', ['linear'], ['zoom'], 3, 0.8, 8, 1.6, 12, 2.4], 'line-opacity':0.95 } }, before);
@@ -16748,7 +16750,7 @@ const C2MAP = (function(){
       map.addLayer({ id:'c2-draw-fill', type:'fill', source:'c2-draw', filter:['==', ['geometry-type'], 'Polygon'], paint:{ 'fill-color':'#ebe7df', 'fill-opacity':0.1 } });
       map.addLayer({ id:'c2-draw-line', type:'line', source:'c2-draw', paint:{ 'line-color':'#ebe7df', 'line-width':2 } });
       S.ready = true;
-      if(S.base === 'sat') setBase('sat');
+      if(S.base !== 'dark') setBase(S.base);
       if(S.front.on) frontOn(true);
       ensureModel(); renderView();
     }
@@ -16758,7 +16760,18 @@ const C2MAP = (function(){
       S.base = b;
       wrap.querySelectorAll('[data-base]').forEach(x => x.classList.toggle('on', x.dataset.base === b));
       setAttr();
-      if(S.ready) S.map.setLayoutProperty('c2-sat', 'visibility', b === 'sat' ? 'visible' : 'none');
+      if(!S.ready) return;
+      const map = S.map;
+      map.setLayoutProperty('c2-sat', 'visibility', b === 'sat' ? 'visible' : 'none');
+      map.setLayoutProperty('c2-black', 'visibility', b === 'black' ? 'visible' : 'none');
+      /* base-map labels and anything else of the base style drawn above the black layer */
+      const ids = map.getStyle().layers.map(l => l.id), at = ids.indexOf('c2-black');
+      ids.slice(at + 1).forEach(id => {
+        if(id.startsWith('c2-')) return;
+        if(!S.baseVis) S.baseVis = {};
+        if(!(id in S.baseVis)) S.baseVis[id] = map.getLayoutProperty(id, 'visibility') || 'visible';
+        map.setLayoutProperty(id, 'visibility', b === 'black' ? 'none' : S.baseVis[id]);
+      });
     }
 
     /* ----- popups ----- */
@@ -27600,7 +27613,7 @@ function fsClose(){
 <script>
 /* PWA-v2: servis işçisi — yalnızca http(s) üzerinde (file:// ve DOWNLOAD SITE kopyasında devre dışı) */
 (function(){
-  var BUILD = '20261126-2030';
+  var BUILD = '20261127-0035';
   var live = ('serviceWorker' in navigator) && /^https?:$/.test(location.protocol);
   var reg = null, lastKick = 0;
   function ctl(){ return live ? navigator.serviceWorker.controller : null; }
