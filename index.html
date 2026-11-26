@@ -1263,6 +1263,30 @@
   #skull-view .c2-fig-l{ font:600 12px/1.5 'Inter',system-ui,sans-serif;letter-spacing:.14em;color:var(--c2-mut);text-transform:uppercase; }
   #skull-view .c2-fig-n{ font-size:12px;color:var(--c2-mut);min-height:16px; }
   #skull-view .c2-bars{ display:flex;flex-direction:column;gap:20px;max-width:1000px; }
+  #skull-view .c2-time{ display:grid;grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:"d steps main" "range range range" "ticks ticks ticks" "src src src";gap:8px 14px;align-items:end;box-sizing:border-box;padding:16px 18px 14px; }
+  #skull-view .c2-time-d{ grid-area:d; }
+  #skull-view .c2-time-steps{ grid-area:steps;display:flex;gap:6px; }
+  #skull-view .c2-time-main{ grid-area:main;display:flex;gap:6px; }
+  #skull-view .c2-range{ grid-area:range; }
+  #skull-view .c2-ticks{ grid-area:ticks; }
+  #skull-view .c2-time-src{ grid-area:src; }
+  #skull-view .c2-time[hidden]{ display:none; }
+  #skull-view .c2-time.c2-out{ position:sticky;bottom:12px;z-index:30;width:auto;margin-top:-6px;box-shadow:0 -8px 26px rgba(0,0,0,.5); }
+  #skull-view .c2-time:not(.c2-out){ position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:5;width:min(640px,calc(100% - 32px)); }
+  #skull-view .c2-time-date{ font-family:'Newsreader',Georgia,serif;font-size:32px;line-height:1.1;color:#fff;font-variant-numeric:tabular-nums; }
+  #skull-view .c2-time .c2-btn{ height:40px;padding:0 12px;font-size:13px;justify-content:center; }
+  #skull-view .c2-time .c2-btn[data-act="fplay"]{ min-width:84px; }
+  #skull-view .c2-range{ -webkit-appearance:none;appearance:none;width:100%;height:32px;margin:0;background:transparent;cursor:pointer; }
+  #skull-view .c2-range::-webkit-slider-runnable-track{ height:4px;background:#3a3936;border-radius:2px; }
+  #skull-view .c2-range::-moz-range-track{ height:4px;background:#3a3936;border-radius:2px; }
+  #skull-view .c2-range::-webkit-slider-thumb{ -webkit-appearance:none;appearance:none;width:22px;height:22px;margin-top:-9px;border-radius:50%;background:var(--c2-yel);border:2px solid #131314; }
+  #skull-view .c2-range::-moz-range-thumb{ width:18px;height:18px;border-radius:50%;background:var(--c2-yel);border:2px solid #131314; }
+  #skull-view .c2-range:focus-visible{ outline:2px solid var(--c2-yel);outline-offset:2px; }
+  #skull-view .c2-ticks{ position:relative;height:16px;margin:-6px 11px 0; }
+  #skull-view .c2-ticks span{ position:absolute;top:0;transform:translateX(-50%);font-size:11px;color:var(--c2-mut);font-variant-numeric:tabular-nums; }
+  #skull-view .c2-time-src{ font-size:12px;line-height:1.45;color:var(--c2-mut); }
+  #skull-view .c2-time-src.sch{ color:#d8b648; }
+  #skull-view .c2-legend div[hidden]{ display:none; }
   #skull-view .c2-years{ display:flex;flex-direction:column;gap:14px;max-width:1000px;margin-top:8px;padding-top:20px;border-top:1px solid var(--c2-line2); }
   #skull-view .c2-years .c2-bars{ gap:14px; }
   #skull-view .c2-years .c2-bar-l span{ font-size:13px; }
@@ -1298,7 +1322,17 @@
   #skull-view .c2-more{ align-self:flex-start;margin-top:16px;background:transparent; }
   #skull-view .c2-foot{ border-top:1px solid var(--c2-line);padding-top:24px;display:flex;flex-direction:column;gap:14px;font-size:13px;line-height:1.7;color:var(--c2-mut);max-width:1000px; }
   #skull-view .c2-m-only{ display:none; }
+  @media (max-width:1100px){
+    #skull-view .c2-map.c2-fs.has-time .c2-legend{ display:none; }
+  }
   @media (max-width:760px){
+    #skull-view .c2-time{ grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"d main" "range range" "ticks ticks" "steps steps" "src src";padding:12px 14px 12px;gap:4px 10px; }
+    #skull-view .c2-time.c2-out{ position:static;box-shadow:none; }
+    #skull-view .c2-time-date{ font-size:24px; }
+    #skull-view .c2-time-d .c2-eyebrow{ font-size:10.5px; }
+    #skull-view .c2-time .c2-btn{ height:40px;padding:0 10px; }
+    #skull-view .c2-time-steps .c2-btn{ flex:1 1 0;padding:0 2px;font-size:12.5px; }
+    #skull-view .c2-time-src{ font-size:11.5px;line-height:1.4; }
     #skull-view .c2-wrap{ padding:32px 16px 48px;gap:44px; }
     #skull-view .c2-head{ padding-bottom:24px; }
     #skull-view .c2-lede{ font-size:15px; }
@@ -5193,31 +5227,20 @@
         <div class="c2-head">
           <div class="c2-eyebrow">Russian personnel losses in Ukraine · February 2022 to September 2026</div>
           <h1 class="c2-title">CARGO <span>200</span></h1>
-          <p class="c2-lede">Three counts from three methods. Below them, two maps of the leaked Rosstat records: where the dead lived, and where they died.</p>
+          <p class="c2-lede">Three counts from three methods. Below them, a map of the leaked Rosstat records: where the dead lived, and where they died.</p>
         </div>
         <div class="c2-nums" id="c2-nums"></div>
         <div class="c2-warn" id="c2-warn"></div>
       </header>
 
-      <section class="c2-sec" id="c2-sec1" aria-label="Map 1">
+      <section class="c2-sec" id="c2-sec1" aria-label="Map">
         <div class="c2-sec-h">
-          <div class="c2-eyebrow y">Map 1 · Rosstat leak, located</div>
+          <div class="c2-eyebrow y">Map · Rosstat leak, located</div>
           <h2 class="c2-h2">Where they lived, where they died</h2>
-          <p class="c2-p" id="c2-p1">The leaked records, as far as they name a place. Nothing is modelled on this map.</p>
+          <p class="c2-p" id="c2-p1">The leaked records, as far as they name a place. Draw a shape to see the estimate for that area (records plus modelled points up to the estimate) and the leak’s own records under it. Switch on the front line and move it through time, from February 2022 to today.</p>
         </div>
         <div class="c2-map" id="c2-map1-wrap" data-kind="located"><div class="c2-canvas" id="c2-map1"></div></div>
-        <p class="c2-note">Yellow: home settlement of the dead. Red: place of death in Ukraine. Both come from the Rosstat leak as mapped by iStories. Draw a shape on the map to count the deaths inside it: the panel shows the estimate for the area on top (records plus modelled points) and the leak’s own records below.</p>
-        <div class="c2-years" data-c2-years></div>
-      </section>
-
-      <section class="c2-sec" id="c2-sec2" aria-label="Map 2">
-        <div class="c2-sec-h">
-          <div class="c2-eyebrow y">Map 2 · Rosstat leak estimate</div>
-          <h2 class="c2-h2">Toward 720,000</h2>
-          <p class="c2-p">The located points of Map 1, plus extra points up to the estimate, spread by the density of the located data and drawn in the same colours. The extra points are a model, not records of individual places.</p>
-        </div>
-        <div class="c2-map" id="c2-map2-wrap" data-kind="estimate"><div class="c2-canvas" id="c2-map2"></div></div>
-        <p class="c2-note" id="c2-note2">Located points come from the Rosstat leak as mapped by iStories. The remainder up to ~720,000 is distributed by the density of the located data, so it shows where the deaths probably are, not who they were.</p>
+        <p class="c2-note">Yellow: home settlement of the dead. Red: place of death in Ukraine. Both come from the Rosstat leak as mapped by iStories. The circles are records only; the modelled points of the estimate are counted in the area panel but not drawn. Front line: DeepState daily data from 8 July 2024; earlier dates are schematic frames redrawn from ISW assessments, about 5–10 km accurate.</p>
         <div class="c2-years" data-c2-years></div>
       </section>
 
@@ -16308,12 +16331,14 @@ renderRosstat();
 /* ROSSTAT-LEAK-END */
 
 /* SKMAP-V2-BEGIN ===========================================================================================
-   CARGO200 maps. Two MapLibre GL maps, built from the place data that iStories extracted from the leaked Rosstat records
+   CARGO200 map. A MapLibre GL map, built from the place data that iStories extracted from the leaked Rosstat records
    (https://istories.media/war-map/regions/). Data files live in the data repo and load at run time (flFetchJson):
      cargo200/residence.json  settlements where the dead lived  [name, lat, lon, count, regionIdx]
      cargo200/death.json      places of death in Ukraine        [name_ru, name_ua, lat, lon, count, raionIdx]
-     cargo200/model.json      modelled remainder up to ~720,000, summed on a grid (Map 2 only; a model, not records)
-   Map 1 = located data only.  Map 2 = the same plus the modelled points, in the same colours.
+     cargo200/model.json      modelled remainder up to ~720,000, summed on a grid (counted in the area panel, not drawn; a model, not records)
+     cargo200/front/*.json    front-line history: index.json (all frame dates), pre.json (schematic frames 2022-02-24 .. 2024-07-01),
+                              YYYY-MM.json (DeepState daily frames); built by tools/build_front.py in the data repo
+   The circles are located records only.
    Base maps: OpenFreeMap vector style (dark) and Esri World Imagery (satellite); no API keys.
    ======================================================================================================= */
 const C2MAP = (function(){
@@ -16327,6 +16352,46 @@ const C2MAP = (function(){
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[ch]));
   const maps = [];
   let libP = null, dataP = null, modelP = null;
+  const FRONT_ATTR = ' · Front line: DeepState (daily); earlier dates: schematic, redrawn from ISW assessments';
+  const DAY = 86400000;
+  const tOf = d => Date.parse(d + 'T00:00:00Z');
+  const dOf = t => new Date(t).toISOString().slice(0, 10);
+  const dFmt = d => new Date(tOf(d)).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric', timeZone:'UTC' });
+  let frontIxP = null;
+  const frontChunks = {}, frontGeo = {};
+  function loadFrontIndex(){
+    if(frontIxP) return frontIxP;
+    frontIxP = flFetchJson('cargo200/front/index.json').then(ix => {
+      const all = ix.pre.map(d => [d, 1]).concat(ix.days.map(d => [d, 0]));
+      return { s: ix.s || 1000, all, first: all[0][0], last: all[all.length - 1][0] };
+    }).catch(e => { frontIxP = null; throw e; });
+    return frontIxP;
+  }
+  function loadFrontChunk(key){
+    if(!frontChunks[key]) frontChunks[key] = flFetchJson('cargo200/front/' + key + '.json').catch(e => { delete frontChunks[key]; throw e; });
+    return frontChunks[key];
+  }
+  /* the latest frame on or before the date: [date, 1 if schematic] */
+  function frameAt(ix, d){
+    let lo = 0, hi = ix.all.length - 1, r = 0;
+    while(lo <= hi){ const m = (lo + hi) >> 1; if(ix.all[m][0] <= d){ r = m; lo = m + 1; } else hi = m - 1; }
+    return ix.all[r];
+  }
+  /* a ring is [x0, y0, dx, dy, ...] in 1/s degree; the polygon source wants closed rings of [lon, lat] */
+  function decRing(a, k){
+    let x = a[0], y = a[1];
+    const out = [[x / k, y / k]];
+    for(let i = 2; i < a.length; i += 2){ x += a[i]; y += a[i + 1]; out.push([x / k, y / k]); }
+    out.push(out[0]);
+    return out;
+  }
+  function frontFeatures(ch, d, sch, k){
+    const key = d + (sch ? 's' : 'd');
+    if(frontGeo[key]) return frontGeo[key];
+    const fr = ch.f.find(f => f.d === d);
+    const g = { type:'FeatureCollection', features: fr ? fr.p.map(poly => ({ type:'Feature', properties:{ s: sch }, geometry:{ type:'Polygon', coordinates: poly.map(r => decRing(r, k)) } })) : [] };
+    return frontGeo[key] = g;
+  }
 
   /* ---------- loading ---------- */
   function loadLib(){
@@ -16494,6 +16559,7 @@ const C2MAP = (function(){
     plus:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>',
     minus:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg>',
     x:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>',
+    front:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 20c3-1 4-5 7-6s4-4 6-7 3-3 5-3" stroke-dasharray="3 3"></path><path d="M4 4v8M4 4h6l-1.5 2L10 8H4"></path></svg>',
     legRes:'<svg width="34" height="22" viewBox="0 0 34 22" aria-hidden="true"><circle cx="6" cy="16" r="3.5" fill="' + YEL + '"></circle><circle cx="16" cy="13" r="6" fill="' + YEL + '"></circle><circle cx="26" cy="11" r="9" fill="' + YEL + '"></circle></svg>',
     legDeath:'<svg width="34" height="12" viewBox="0 0 34 12" aria-hidden="true"><circle cx="17" cy="6" r="4" fill="' + RED + '"></circle></svg>',
   };
@@ -16503,9 +16569,8 @@ const C2MAP = (function(){
   };
 
   function create(wrap){
-    const est = wrap.dataset.kind === 'estimate';
     const cv = wrap.querySelector('.c2-canvas');
-    const S = { wrap, est, map:null, D:null, M:null, base:'dark', tool:null, pts:[], ring:null, markers:[], start:null, last:null, popup:null, fs:false, drawer:null };
+    const S = { wrap, map:null, D:null, M:null, front:{ on:false, date:null, ix:null, seq:0, timer:0, busy:false }, base:'dark', tool:null, pts:[], ring:null, markers:[], start:null, last:null, popup:null, fs:false, drawer:null };
     const q = sel => wrap.querySelector(sel);
 
     /* chrome */
@@ -16521,27 +16586,40 @@ const C2MAP = (function(){
       + '<div class="c2-draw-act"><button type="button" class="c2-btn" data-act="finish">Finish shape</button><button type="button" class="c2-btn" data-act="cancel">Cancel</button></div></div>'
       + '<div class="c2-bar"><div class="c2-panel c2-seg"><button type="button" class="c2-btn on" data-base="dark">Dark</button><button type="button" class="c2-btn" data-base="sat">Satellite</button></div>'
       + '<button type="button" class="c2-btn c2-m-only" data-act="drawtoggle" aria-expanded="false" aria-label="Draw an area to count" title="Draw an area to count">' + ICON.poly + '<span>Draw</span></button>'
+      + '<button type="button" class="c2-btn" data-act="front" aria-pressed="false" aria-label="Front line by date" title="Front line by date">' + ICON.front + '<span class="c2-btn-t">Front line</span></button>'
       + '<button type="button" class="c2-btn" data-act="fs" aria-pressed="false">' + ICON.full + '<span class="c2-btn-t">Full screen</span></button>'
       + '<button type="button" class="c2-btn" data-act="list" aria-expanded="false">' + ICON.list + '<span class="c2-btn-t">List</span></button>'
       + '<button type="button" class="c2-btn" data-act="about">' + ICON.info + '<span class="c2-btn-t">About the map</span></button></div>'
       + '<div class="c2-panel c2-zoom"><button type="button" class="c2-sq" data-act="zin" aria-label="Zoom in">' + ICON.plus + '</button><i></i><button type="button" class="c2-sq" data-act="zout" aria-label="Zoom out">' + ICON.minus + '</button></div>'
       + '<div class="c2-panel c2-legend"><div>' + ICON.legRes + '<span>Where the dead lived, sized by number</span></div><div>' + ICON.legDeath + '<span>Place of death in Ukraine</span></div>'
-      + (est ? '<small>Includes modelled points up to ~' + fmt(SKULL_DATA.leakEstimate.value) + '</small>' : '') + '</div>'
+      + '<div class="c2-leg-front" hidden><svg width="34" height="14" viewBox="0 0 34 14" aria-hidden="true"><rect x="1" y="1" width="32" height="12" fill="#c98a2c" fill-opacity=".25" stroke="#e6b85c" stroke-width="1.5"></rect></svg><span>Territory held by Russia</span></div></div>'
+      + '<div class="c2-panel c2-time" hidden><div class="c2-time-d"><div class="c2-eyebrow">Front line · territory held by Russia</div><div class="c2-time-date" aria-live="polite">—</div></div>'
+      + '<div class="c2-time-steps"><button type="button" class="c2-btn" data-fstep="-30" aria-label="30 days back">−30 d</button><button type="button" class="c2-btn" data-fstep="-7" aria-label="7 days back">−7 d</button><button type="button" class="c2-btn" data-fstep="-1" aria-label="1 day back">−1 d</button>'
+      + '<button type="button" class="c2-btn" data-fstep="1" aria-label="1 day forward">+1 d</button><button type="button" class="c2-btn" data-fstep="7" aria-label="7 days forward">+7 d</button><button type="button" class="c2-btn" data-fstep="30" aria-label="30 days forward">+30 d</button></div>'
+      + '<div class="c2-time-main"><button type="button" class="c2-btn" data-act="fplay" aria-pressed="false">Play</button><button type="button" class="c2-btn" data-act="fnow">Latest</button></div>'
+      + '<input type="range" class="c2-range" min="0" max="1" step="1" value="1" aria-label="Date of the front line" disabled><div class="c2-ticks" aria-hidden="true"></div>'
+      + '<div class="c2-time-src">Loading the front line…</div></div>'
       + '<div class="c2-attr"></div>'
       + '<div class="c2-panel c2-result" aria-live="polite"></div>'
       + '<div class="c2-panel c2-drawer"></div>'
       + '<div class="c2-about"><div class="c2-panel c2-about-in"></div></div>';
     while(chrome.firstChild) wrap.appendChild(chrome.firstChild);
-    const hintEl = q('.c2-draw-hint'), actEl = q('.c2-draw-act'), resEl = q('.c2-result'), attrEl = q('.c2-attr'), legEl = q('.c2-legend');
+    const hintEl = q('.c2-draw-hint'), actEl = q('.c2-draw-act'), resEl = q('.c2-result'), attrEl = q('.c2-attr'), legEl = q('.c2-legend'), timeEl = q('.c2-time');
+    const rangeEl = timeEl.querySelector('.c2-range'), dateEl = timeEl.querySelector('.c2-time-date'), srcEl = timeEl.querySelector('.c2-time-src'), ticksEl = timeEl.querySelector('.c2-ticks');
+    const legFrontEl = legEl.querySelector('.c2-leg-front'), playEl = timeEl.querySelector('[data-act="fplay"]'), frontBtn = q('[data-act="front"]');
     /* on a phone the legend and the numbers sit below the map (as in the approved design); in full screen they go back on top of it */
     function place(){
       const out = mq.matches && !S.fs;
       legEl.classList.toggle('c2-out', out); resEl.classList.toggle('c2-out', out);
-      if(out){ wrap.after(legEl); legEl.after(resEl); } else { wrap.appendChild(legEl); wrap.appendChild(resEl); }
+      /* the date panel sits right under the map (in full screen it floats over the map) */
+      timeEl.classList.toggle('c2-out', !S.fs);
+      if(S.fs) wrap.appendChild(timeEl); else wrap.after(timeEl);
+      if(out){ timeEl.after(legEl); legEl.after(resEl); } else { wrap.appendChild(legEl); wrap.appendChild(resEl); }
     }
     if(mq.addEventListener) mq.addEventListener('change', place); else if(mq.addListener) mq.addListener(place);
     place();
-    attrEl.innerHTML = ATTR.dark;
+    function setAttr(){ attrEl.innerHTML = ATTR[S.base] + (S.front.on ? FRONT_ATTR : ''); }
+    setAttr();
 
     function fail(msg){
       if(q('.c2-fail')) return;
@@ -16550,8 +16628,8 @@ const C2MAP = (function(){
 
     /* ----- map construction ----- */
     function start(){
-      return Promise.all([loadLib(), loadData(), est ? loadModel() : Promise.resolve(null)]).then(a => {
-        S.D = a[1]; S.M = a[2];
+      return Promise.all([loadLib(), loadData()]).then(a => {
+        S.D = a[1];
         build(a[0]);
       }).catch(e => { console.warn('[CARGO200] map', e); fail('The map could not be loaded. Check your connection and reload the page.'); });
     }
@@ -16587,14 +16665,12 @@ const C2MAP = (function(){
       map.addSource('c2-sat', { type:'raster', tiles:[SAT_TILES], tileSize:256, maxzoom:17 });
       map.addLayer({ id:'c2-sat', type:'raster', source:'c2-sat', layout:{ visibility:'none' }, paint:{ 'raster-brightness-max':0.8, 'raster-saturation':-0.15, 'raster-fade-duration':0 } }, bound && bound.id);
       const before = label && label.id;
+      map.addSource('c2-front', { type:'geojson', data:{ type:'FeatureCollection', features:[] } });
+      map.addLayer({ id:'c2-front-fill', type:'fill', source:'c2-front', layout:{ visibility:'none' }, paint:{ 'fill-color':'#c98a2c', 'fill-opacity':['case', ['==', ['get', 's'], 1], 0.09, 0.14] } }, before);
+      map.addLayer({ id:'c2-front-line', type:'line', source:'c2-front', filter:['==', ['get', 's'], 0], layout:{ visibility:'none', 'line-join':'round' }, paint:{ 'line-color':'#e6b85c', 'line-width':['interpolate', ['linear'], ['zoom'], 3, 0.8, 8, 1.6, 12, 2.4], 'line-opacity':0.95 } }, before);
+      map.addLayer({ id:'c2-front-dash', type:'line', source:'c2-front', filter:['==', ['get', 's'], 1], layout:{ visibility:'none', 'line-join':'round' }, paint:{ 'line-color':'#e6b85c', 'line-width':['interpolate', ['linear'], ['zoom'], 3, 0.8, 8, 1.6, 12, 2.4], 'line-opacity':0.9, 'line-dasharray':[2, 2] } }, before);
       map.addSource('c2-res', { type:'geojson', data: D.resGeo });
       map.addSource('c2-death', { type:'geojson', data: D.deathGeo });
-      if(est && S.M){
-        map.addSource('c2-mres', { type:'geojson', data: S.M.res.geo });
-        map.addSource('c2-mdeath', { type:'geojson', data: S.M.death.geo });
-        map.addLayer(dots('c2-mres', 'c2-mres', YEL, 1, 0.4), before);
-        map.addLayer(dots('c2-mdeath', 'c2-mdeath', RED, 0.8, 0.45), before);
-      }
       map.addLayer(dots('c2-res', 'c2-res', YEL, 1, 0.62), before);
       map.addLayer(dots('c2-death', 'c2-death', RED, 0.8, 0.72), before);
       map.addSource('c2-draw', { type:'geojson', data:{ type:'FeatureCollection', features:[] } });
@@ -16602,13 +16678,14 @@ const C2MAP = (function(){
       map.addLayer({ id:'c2-draw-line', type:'line', source:'c2-draw', paint:{ 'line-color':'#ebe7df', 'line-width':2 } });
       S.ready = true;
       if(S.base === 'sat') setBase('sat');
+      if(S.front.on) frontOn(true);
     }
 
     /* ----- base map ----- */
     function setBase(b){
       S.base = b;
       wrap.querySelectorAll('[data-base]').forEach(x => x.classList.toggle('on', x.dataset.base === b));
-      attrEl.innerHTML = ATTR[b];
+      setAttr();
       if(S.ready) S.map.setLayoutProperty('c2-sat', 'visibility', b === 'sat' ? 'visible' : 'none');
     }
 
@@ -16623,10 +16700,10 @@ const C2MAP = (function(){
         const r = D.places[p.i], ra = D.raions[r[5]];
         return '<b>' + esc(r[0]) + (r[1] && r[1] !== r[0] ? ' · ' + esc(r[1]) : '') + '</b><br>' + fmt(r[4]) + ' died here' + (ra ? '<br><small>' + esc(ra[1]) + ' · ' + esc(ra[2]) + '</small>' : '');
       }
-      return '<b>Modelled</b><br>~' + fmt(p.c) + ' points in this spot<br><small>Part of the estimate, not records of a place</small>';
+      return '';
     }
     function hit(pt){
-      const L = ['c2-res', 'c2-death'].concat(est ? ['c2-mres', 'c2-mdeath'] : []).filter(id => S.map.getLayer(id));
+      const L = ['c2-res', 'c2-death'].filter(id => S.map.getLayer(id));
       return S.map.queryRenderedFeatures([[pt.x - 7, pt.y - 7], [pt.x + 7, pt.y + 7]], { layers: L });
     }
     function popup(lngLat, html){
@@ -16746,7 +16823,7 @@ const C2MAP = (function(){
       const bb = bbox(ring);
       const lived = countIn(ring, bb, D.rLon, D.rLat, D.rC), died = countIn(ring, bb, D.pLon, D.pLat, D.pC);
       const area = ringArea(ring);
-      /* the modelled points are counted on both maps (Map 1 only draws the records, but its panel gives the same estimate as Map 2) */
+      /* the modelled points (model.json, loaded on the first area) are only counted here, not drawn on the map */
       let ml = null, md = null;
       if(S.M){
         ml = countIn(ring, bb, S.M.res.lon, S.M.res.lat, S.M.res.c); md = countIn(ring, bb, S.M.death.lon, S.M.death.lat, S.M.death.c);
@@ -16832,14 +16909,92 @@ const C2MAP = (function(){
       q('.c2-about-in').innerHTML = '<button type="button" class="c2-sq c2-x" data-act="aboutclose" aria-label="Close">' + ICON.x + '</button>'
         + '<h3>About the map</h3>'
         + '<h4>What the circles are</h4><p>Yellow circles are the settlements where the dead lived, sized by the number of people. Red circles are the places of death in Ukraine, also sized by number. Both come from the leaked Rosstat death-certificate database, placed on the map by <a href="https://istories.media/war-map/regions/" target="_blank" rel="noopener">iStories</a>. The leak is unverified.</p>'
-        + (est ? '<h4>The estimate</h4><p>This map adds points up to the estimate of about ' + fmt(SKULL_DATA.leakEstimate.value) + ' (Meduza and Mediazona, 23 November 2026). They are spread in proportion to the located data and drawn in the same colours. They are a model of where the deaths probably are, not records of individual places. The method is stored with the data.</p>'
-               : '<h4>Nothing is modelled here</h4><p>Map 1 draws only what the records name. The next map also draws the modelled remainder of the estimate. The area panel is the same on both maps: it adds the modelled points to the records so that the top figure is the estimate.</p>')
+        + '<h4>The estimate</h4><p>The area panel adds points up to the estimate of about ' + fmt(SKULL_DATA.leakEstimate.value) + ' (Meduza and Mediazona, 23 November 2026) to the records. They are spread in proportion to the located data. They are a model of where the deaths probably are, not records of individual places, and they are not drawn on the map. The method is stored with the data.</p>'
         + '<h4>Counting in an area</h4><p>Draw a polygon, box or circle. The top block is the estimate for the area (located records plus modelled points, scaled to about ' + fmt(SKULL_DATA.leakEstimate.value) + '). The bottom block is only what the Rosstat leak names. “Lived here” counts home settlements, which the data holds for Russia only, so an area in Ukraine shows none. “Died here” counts the located places of death.</p>'
         + '<h4>Limits</h4><p>The latest months are incomplete because deaths are registered with a lag.' + (hid ? ' The source marks ' + fmt(hid.n) + ' deaths at ' + fmt(hid.places) + ' places as hidden, so they are not on the map.' : '') + ' Deaths registered without a named place are not on the map.</p>'
-        + '<h4>Data and credit</h4><p>Data: iStories (Rosstat leak). Base maps: OpenFreeMap, OpenMapTiles and OpenStreetMap contributors; satellite imagery © Esri, Maxar, Earthstar Geographics.</p>';
+        + '<h4>The front line</h4><p>The shaded area is the territory held by Russia on the chosen date, with its edge as a line. From 8 July 2024 it is the daily DeepState map (as archived by <a href="https://github.com/cyterat/deepstate-map-data" target="_blank" rel="noopener">cyterat/deepstate-map-data</a>), simplified to about 200 metres. Earlier dates are schematic: frames redrawn from ISW assessments by <a href="https://github.com/longlinecode/russo-ukrainian-front-daily" target="_blank" rel="noopener">longlinecode/russo-ukrainian-front-daily</a>, accurate to about 5 to 10 km and moving in steps, so a date shows the nearest earlier frame. Crimea and the territory held before 24 February 2022 are included.</p>'
+        + '<h4>Data and credit</h4><p>Data: iStories (Rosstat leak); front line: DeepState and ISW (see above). Base maps: OpenFreeMap, OpenMapTiles and OpenStreetMap contributors; satellite imagery © Esri, Maxar, Earthstar Geographics.</p>';
       q('.c2-about').classList.add('on');
       const x = q('.c2-x'); if(x) x.focus();
     }
+
+    /* ----- front line by date ----- */
+    const F = S.front;
+    const FRONT_LAYERS = ['c2-front-fill', 'c2-front-line', 'c2-front-dash'];
+    function frontSpanDays(){ return Math.round((tOf(F.ix.last) - tOf(F.ix.first)) / DAY); }
+    function frontDateOf(v){ return dOf(tOf(F.ix.first) + v * DAY); }
+    function frontSetDate(d, fromRange){
+      if(!F.ix) return Promise.resolve();
+      if(d < F.ix.first) d = F.ix.first;
+      if(d > F.ix.last) d = F.ix.last;
+      F.date = d;
+      dateEl.textContent = dFmt(d);
+      if(!fromRange) rangeEl.value = String(Math.round((tOf(d) - tOf(F.ix.first)) / DAY));
+      const seq = ++F.seq, fr = frameAt(F.ix, d), sch = fr[1], key = sch ? 'pre' : fr[0].slice(0, 7);
+      F.busy = true;
+      return loadFrontChunk(key).then(ch => {
+        if(seq !== F.seq || !S.map) return;
+        const src = S.map.getSource('c2-front');
+        if(src) src.setData(frontFeatures(ch, fr[0], sch, F.ix.s));
+        const near = fr[0] !== d ? ' Nearest earlier frame: ' + dFmt(fr[0]) + '.' : '';
+        srcEl.classList.toggle('sch', !!sch);
+        srcEl.textContent = sch ? 'Schematic: redrawn from ISW assessments, accurate to about 5 to 10 km, moves in steps.' + near : 'DeepState, daily.' + near;
+        F.frame = fr[0];
+      }).catch(e => { console.warn('[CARGO200] front', e); if(seq === F.seq) srcEl.textContent = 'The front line for this date could not be loaded.'; })
+        .then(() => { if(seq === F.seq) F.busy = false; });
+    }
+    function frontTicks(){
+      const a = tOf(F.ix.first), b = tOf(F.ix.last);
+      let h = '';
+      for(let y = new Date(a).getUTCFullYear(); y <= new Date(b).getUTCFullYear(); y++){
+        const t = Math.max(a, tOf(y + '-01-01')), pct = (t - a) / (b - a) * 100;
+        if(y > new Date(a).getUTCFullYear() && pct > 94) continue;
+        h += '<span style="left:' + pct.toFixed(2) + '%">' + y + '</span>';
+      }
+      ticksEl.innerHTML = h;
+    }
+    function frontStopPlay(){
+      if(F.timer){ clearInterval(F.timer); F.timer = 0; }
+      playEl.textContent = 'Play'; playEl.setAttribute('aria-pressed', 'false');
+    }
+    function frontPlay(){
+      if(F.timer){ frontStopPlay(); return; }
+      if(!F.ix) return;
+      if(F.date >= F.ix.last) F.date = F.ix.first;
+      playEl.textContent = 'Pause'; playEl.setAttribute('aria-pressed', 'true');
+      F.timer = setInterval(() => {
+        if(F.busy) return;
+        const n = dOf(tOf(F.date) + 7 * DAY);
+        if(n >= F.ix.last){ frontSetDate(F.ix.last); frontStopPlay(); return; }
+        frontSetDate(n);
+      }, 150);
+    }
+    function frontOn(on){
+      F.on = on;
+      frontBtn.classList.toggle('on', on); frontBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      timeEl.hidden = !on; legFrontEl.hidden = !on; wrap.classList.toggle('has-time', on);
+      /* the first time it is switched on, show Ukraine (the map opens on all of Russia, where the front line is a speck) */
+      if(on && S.ready && !F.flown && S.map.getZoom() < 5.5){ F.flown = true; S.map.fitBounds([[22.0, 44.0], [41.8, 52.6]], { padding: 50, maxZoom: 6.5, duration: 900 }); }
+      setAttr();
+      if(!on) frontStopPlay();
+      if(S.ready) FRONT_LAYERS.forEach(id => { if(S.map.getLayer(id)) S.map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none'); });
+      if(on && S.ready && !F.ix){
+        loadFrontIndex().then(ix => {
+          F.ix = ix;
+          rangeEl.max = String(frontSpanDays()); rangeEl.disabled = false;
+          frontTicks();
+          frontSetDate(F.date || ix.last);
+        }).catch(e => { console.warn('[CARGO200] front index', e); srcEl.textContent = 'The front line could not be loaded. Check your connection and try again.'; });
+      } else if(on && F.ix){ frontSetDate(F.date || F.ix.last); }
+    }
+    rangeEl.addEventListener('input', () => { if(F.ix){ frontStopPlay(); frontSetDate(frontDateOf(+rangeEl.value), true); } });
+    timeEl.addEventListener('click', e => {
+      const t = e.target.closest('[data-fstep],[data-act]');
+      if(!t || !F.ix) return;
+      if(t.dataset.fstep){ frontStopPlay(); frontSetDate(dOf(tOf(F.date) + (+t.dataset.fstep) * DAY)); return; }
+      if(t.dataset.act === 'fplay') frontPlay();
+      else if(t.dataset.act === 'fnow'){ frontStopPlay(); frontSetDate(F.ix.last); }
+    });
 
     /* ----- full screen ----- */
     function setFs(on){
@@ -16905,6 +17060,7 @@ const C2MAP = (function(){
           case 'list': q('.c2-drawer').classList.contains('on') ? closeDrawer() : openDrawer(); break;
           case 'listclose': closeDrawer(); break;
           case 'about': openAbout(); break;
+          case 'front': frontOn(!F.on); break;
           case 'aboutclose': q('.c2-about').classList.remove('on'); break;
           case 'finish': finishPolygon(); break;
           case 'cancel': clearShape(); endTool(); break;
@@ -16941,7 +17097,7 @@ const C2MAP = (function(){
       inp.addEventListener('keydown', e => { if(e.key === 'Enter' && res._hits && res._hits[0]){ e.preventDefault(); go(res._hits[0]); } if(e.key === 'Escape'){ res.classList.remove('on'); } });
       res.addEventListener('click', e => { const b = e.target.closest('button[data-n]'); if(b && res._hits) go(res._hits[+b.dataset.n]); });
     }
-    return { S, start, resize(){ if(S.map) S.map.resize(); }, api:{ startTool, clearShape, setBase, finishPolygon, addVertex, setFs, openDrawer, openAbout, result: renderResult } };
+    return { S, start, resize(){ if(S.map) S.map.resize(); }, api:{ startTool, clearShape, setBase, finishPolygon, addVertex, setFs, openDrawer, openAbout, result: renderResult, frontOn, frontSetDate } };
   }
 
   /* ---------- page glue ---------- */
@@ -27345,7 +27501,7 @@ function fsClose(){
 <script>
 /* PWA-v2: servis işçisi — yalnızca http(s) üzerinde (file:// ve DOWNLOAD SITE kopyasında devre dışı) */
 (function(){
-  var BUILD = '20261126-1845';
+  var BUILD = '20261126-1955';
   var live = ('serviceWorker' in navigator) && /^https?:$/.test(location.protocol);
   var reg = null, lastKick = 0;
   function ctl(){ return live ? navigator.serviceWorker.controller : null; }
