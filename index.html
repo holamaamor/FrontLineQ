@@ -3229,6 +3229,12 @@
 
   /* ---- editör medya ---- */
   .ed-media{ display:flex;flex-wrap:wrap;gap:6px;margin-top:4px; }
+  .edgl{ border:1px solid #2a343b;background:#0a1015;padding:8px 8px 6px;margin-bottom:8px; }
+  .edgl-h{ display:flex;justify-content:space-between;align-items:center;font-size:9px;letter-spacing:2px;color:#c9a227;margin-bottom:6px; }
+  .edgl-x{ cursor:pointer;color:#8a98a3;padding:2px 6px;font-size:12px; }
+  .edgl-x:hover{ color:#e0584a; }
+  .edgl input[data-glf]{ width:100%;box-sizing:border-box;margin-bottom:5px; }
+  .edgl .edgl-info{ margin:0 0 6px; }
   .edm{ position:relative;width:64px;height:48px;overflow:hidden;border:1px solid #2a343b; }
   .edm img, .edm video{ width:100%;height:100%;object-fit:cover;display:block; }
   .edm-x{
@@ -3340,6 +3346,7 @@
   .lb-geo .lg-ph .lt.on{ border-color:#c9a227; }
   .lb-geo .lg-ph .lt img, .lb-geo .lg-ph .lt video{ width:100%;height:100%;object-fit:cover;display:block; }
   .lb-geo .lg-note{ flex:0 0 100%;font-size:8px;letter-spacing:1px;color:#5e6d77; }
+  .lb-geo .lg-sep{ flex:0 0 100%;border-top:1px solid #1e272d;margin:2px 0; }
   .lb-geo .lg-empty{ font-size:10px;line-height:1.5;letter-spacing:.6px;color:#5e6d77;padding:4px 0; }
   .lb-geo .lg-ln{ display:flex;flex-direction:column;gap:6px;flex:0 1 330px;min-width:0; }
   .lb-geo .lg-ln a{
@@ -6568,14 +6575,31 @@ const FLink = (function(){
      (Avrupa–Rusya) dışındaki sayı çiftleri yok sayılır */
   function extractCoords(s){
     s = String(s || '');
-    let m = s.match(/@(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/)
-         || s.match(/[?&](?:q|ll|query|destination)=(-?\d{1,2}\.\d+),\s*(-?\d{1,3}\.\d+)/)
-         || s.match(/!3d(-?\d{1,2}\.\d{3,})!4d(-?\d{1,3}\.\d{3,})/)
-         || s.match(/(?:^|[^\d.\-])(-?\d{2}\.\d{3,})\s*[,;\/ ]\s*(\d{2,3}\.\d{3,})(?!\d)/);
-    if(!m) return null;
-    const la = parseFloat(m[1]), ln = parseFloat(m[2]);
-    if(!(la >= 40 && la <= 72 && ln >= 18 && ln <= 180)) return null;
-    return [la, ln];
+    const ok = (la, ln)=> la >= 40 && la <= 72 && ln >= 18 && ln <= 180;
+    /* GEOLOC-v1: ordered tries; the first one that gives a point inside the war zone wins */
+    const tries = [
+      /@(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/,
+      /[?&](?:q|ll|query|destination)=(-?\d{1,2}\.\d+),\s*(-?\d{1,3}\.\d+)/,
+      /!3d(-?\d{1,2}\.\d{3,})!4d(-?\d{1,3}\.\d{3,})/,
+      /[?&#](?:m?lat|latitude)=(-?\d{1,2}\.\d+)(?:&amp;|&|;)(?:m?lon|m?lng|long|longitude)=(-?\d{1,3}\.\d+)/i,     /* map links: ?lat=..&lng=.. (UkrDailyUpdate, OSM mlat/mlon) */
+      /#map=\d{1,2}\/(-?\d{1,2}\.\d+)\/(-?\d{1,3}\.\d+)/,                                                              /* openstreetmap.org/#map=z/lat/lon */
+      /(?:^|[^\d.\-])(-?\d{2}\.\d{3,})\s*°?\s*N\b[\s,;\/]*(\d{2,3}\.\d{3,})\s*°?\s*E\b/i,                            /* 48.3499 N, 37.2159 E */
+      /(?:^|[^\d.\-])(-?\d{2}\.\d{3,})\s*[,;\/ ]\s*(\d{2,3}\.\d{3,})(?!\d)/,
+    ];
+    for(const re of tries){
+      const m = s.match(re);
+      if(!m) continue;
+      const la = parseFloat(m[1]), ln = parseFloat(m[2]);
+      if(ok(la, ln)) return [la, ln];
+    }
+    /* degrees-minutes-seconds / degrees-decimal-minutes: 48°20'59.8"N 37°12'57.5"E */
+    const dms = s.match(/(\d{1,2})\s*[°º]\s*(\d{1,2})\s*['′’]\s*(?:(\d{1,2}(?:\.\d+)?)\s*(?:["″”]|''|′′|’’))?\s*([NС])[\s,;\/]*(\d{1,3})\s*[°º]\s*(\d{1,2})\s*['′’]\s*(?:(\d{1,2}(?:\.\d+)?)\s*(?:["″”]|''|′′|’’))?\s*([EВ])/i);
+    if(dms){
+      const la = +dms[1] + (+dms[2]) / 60 + (+(dms[3] || 0)) / 3600;
+      const ln = +dms[5] + (+dms[6]) / 60 + (+(dms[7] || 0)) / 3600;
+      if(ok(la, ln)) return [Math.round(la * 1e6) / 1e6, Math.round(ln * 1e6) / 1e6];
+    }
+    return null;
   }
 
   /* ---------------- bağlantı sınıflandırma ---------------- */
@@ -11847,7 +11871,7 @@ FRONTS.forEach(f=>{ if(!f._baseOutline) f._baseOutline = f.outline.map(p=> p.sli
   FRONTS.forEach(f=>{
     /* "russia" kutusu sabit kalır — bkz. fitFrontsToEvents() yorumu */
     if(f.id === 'russia') return;
-    const pts = EVENTS.filter(e=> e.front === f.id && e.geo).map(e=> e.geo);
+    const pts = EVENTS.filter(e=> e.front === f.id && e.geo).flatMap(evPoints);
     if(!pts.length) return;
     const lats = f._baseOutline.map(p=>p[0]).concat(pts.map(p=>p[0]));
     const lngs = f._baseOutline.map(p=>p[1]).concat(pts.map(p=>p[1]));
@@ -11888,7 +11912,14 @@ function geoIcon(ev){
   });
 }
 
-function popupHtml(ev){
+/* GEOLOC-v1: an event has one MAIN point (ev.geo) and may have more (ev.geoMore = [{geo:[lat,lon], src, media[]}]) */
+function evMore(ev){ return (ev && Array.isArray(ev.geoMore)) ? ev.geoMore.filter(g=> g && Array.isArray(g.geo) && g.geo.length === 2) : []; }
+function evPoints(ev){ return (ev && ev.geo) ? [ev.geo].concat(evMore(ev).map(g=> g.geo)) : []; }
+
+function popupHtml(ev, k){
+  k = k || 0;
+  const pts = evPoints(ev), pt = pts[k] || ev.geo;
+  const gsrc = k > 0 ? ((evMore(ev)[k - 1] || {}).src || '') : (ev.geoSrc || '');
   const front = FRONTS.find(f=>f.id===ev.front);
   const typeColor = TYPE_COLORS[ev.type] || '#8a8d96';
   const opHtml = (ev.operation && ev.operation !== 'Unnamed' && ev.operation !== '—')
@@ -11915,7 +11946,7 @@ function popupHtml(ev){
       </div>
       <div class="popup-type">${esc(ev.type)}</div>
       ${opHtml}
-      ${ev.geo ? `<div class="popup-geo">● ${ev.geo[0].toFixed(6)}, ${ev.geo[1].toFixed(6)}</div>` : ``}
+      ${pt ? `<div class="popup-geo">● ${pt[0].toFixed(6)}, ${pt[1].toFixed(6)}${pts.length > 1 ? ` · LOCATION ${k + 1}/${pts.length}` : ''}</div>` : ``}
       ${(ev.media && ev.media.length) ? `<div class="pop-media">${
         ev.media.slice(0,4).map((m,k)=>{
           const kd = flMediaKind(m);
@@ -11925,9 +11956,9 @@ function popupHtml(ev){
             : `<span class="pm" data-evmi="${k}"><img src="${safeUrl(m)}" alt=""></span>`;
         }).join('')
       }${ev.media.length > 4 ? `<span class="pm more">+${ev.media.length-4}</span>` : ''}</div>` : ''}
-      ${(ev.mainSrc || ev.geoSrc || (ev.extraSrc||[]).length) ? `<div class="popup-srcs">
+      ${(ev.mainSrc || gsrc || (ev.extraSrc||[]).length) ? `<div class="popup-srcs">
         ${ev.mainSrc ? `<a href="${safeUrl(ev.mainSrc)}" target="_blank" rel="noopener">MAIN SOURCE ↗</a>` : ''}
-        ${ev.geoSrc ? `<a href="${safeUrl(ev.geoSrc)}" target="_blank" rel="noopener">GEO SOURCE ↗</a>` : ''}
+        ${gsrc ? `<a href="${safeUrl(gsrc)}" target="_blank" rel="noopener">GEO SOURCE ↗</a>` : ''}
         ${(ev.extraSrc||[]).filter(u=>safeUrl(u)).map((u,i)=>
           `<a href="${safeUrl(u)}" target="_blank" rel="noopener">SOURCE ${i+2} ↗</a>`).join('')}
       </div>` : ''}
@@ -11937,10 +11968,12 @@ function popupHtml(ev){
   </div>`;
 }
 
-function buildEventMarker(ev, i){
-  if(!ev.geo) return null;
-  const m = L.marker(ev.geo, { icon: geoIcon(ev) });
-  m.bindPopup(popupHtml(ev), { closeButton:true, maxWidth:290, offset:[0,-6] });
+function buildEventMarker(ev, i, k){
+  k = k || 0;
+  const pt = evPoints(ev)[k];
+  if(!pt) return null;
+  const m = L.marker(pt, { icon: geoIcon(ev) });
+  m.bindPopup(popupHtml(ev, k), { closeButton:true, maxWidth:290, offset:[0,-6] });
   m.on('click', ()=> selectEvent(i, true));
   m.on('popupopen', pe=>{
     const root = pe.popup && pe.popup.getElement ? pe.popup.getElement() : null;
@@ -11953,6 +11986,22 @@ function buildEventMarker(ev, i){
   return m;
 }
 
+/* GEOLOC-v1: the event's extra points are separate markers kept next to the main one */
+const markerExtra = {};   // event index -> [extra markers]
+function buildEventExtras(ev, i){
+  const out = [];
+  for(let k = 1; k < evPoints(ev).length; k++){ const m = buildEventMarker(ev, i, k); if(m) out.push(m); }
+  return out;
+}
+function evMarkersAdd(i){
+  if(markerRefs[i]) markerRefs[i].addTo(map);
+  (markerExtra[i] || []).forEach(m=> m.addTo(map));
+}
+function evMarkersRemove(i){
+  if(markerRefs[i] && map.hasLayer(markerRefs[i])) map.removeLayer(markerRefs[i]);
+  (markerExtra[i] || []).forEach(m=>{ if(map.hasLayer(m)) map.removeLayer(m); });
+}
+
 /* Editörden olay eklenip silindiğinde işaretleri yeniden kur.
    Aksi halde yeni kayıt panelde görünür ama haritada nokta çıkmaz. */
 function rebuildEventMarkers(){
@@ -11962,13 +12011,17 @@ function rebuildEventMarkers(){
     if(m && map.hasLayer(m)) map.removeLayer(m);
     delete markerRefs[k];
   });
+  Object.keys(markerExtra).forEach(k=>{
+    (markerExtra[k] || []).forEach(m=>{ if(map.hasLayer(m)) map.removeLayer(m); });
+    delete markerExtra[k];
+  });
   EVENTS.forEach((ev,i)=>{
     const m = buildEventMarker(ev, i);
-    if(m) markerRefs[i] = m;
+    if(m){ markerRefs[i] = m; markerExtra[i] = buildEventExtras(ev, i); }
   });
 }
 
-EVENTS.forEach((ev,i)=>{ const m = buildEventMarker(ev, i); if(m) markerRefs[i] = m; });
+EVENTS.forEach((ev,i)=>{ const m = buildEventMarker(ev, i); if(m){ markerRefs[i] = m; markerExtra[i] = buildEventExtras(ev, i); } });
 
 /* ---------------------------------------------------------------
    Cephe kutularını olaylara göre genişlet.
@@ -11988,7 +12041,7 @@ function fitFrontsToEvents(){
        yine de kendi gerçek koordinatlarında doğru görünür. */
     if(f.id === 'russia'){ f.outline = f._baseOutline.map(p=> p.slice()); return; }
 
-    const pts = EVENTS.filter(e=> e.front === f.id && e.geo).map(e=> e.geo);
+    const pts = EVENTS.filter(e=> e.front === f.id && e.geo).flatMap(evPoints);
     /* olay yoksa özgün kutuya dön */
     if(!pts.length){ f.outline = f._baseOutline.map(p=> p.slice()); return; }
 
@@ -12062,6 +12115,7 @@ function setActiveFront(id){
   map.closePopup();
   Object.values(frontLayers).forEach(l=> map.removeLayer(l));
   Object.values(markerRefs).forEach(m=> map.removeLayer(m));
+  Object.values(markerExtra).forEach(a=> a.forEach(m=>{ if(map.hasLayer(m)) map.removeLayer(m); }));
 
   const fronts = visibleFronts();
   /* Front polygons appear ONLY when a single front is selected from
@@ -12077,7 +12131,7 @@ function setActiveFront(id){
   /* Kutuların yanı sıra gerçek olay koordinatlarını da kapsama al —
      "russia" seçiliyken kutu sabit/küçük olduğundan, harita yalnızca
      kutuya değil asıl işaretlerin bulunduğu noktalara da odaklanır. */
-  const eventPts = EVENTS.filter(e=> fronts.some(f=>f.id===e.front) && e.geo).map(e=>e.geo);
+  const eventPts = EVENTS.filter(e=> fronts.some(f=>f.id===e.front) && e.geo).flatMap(evPoints);
   const boxPts = fronts.filter(f=>f.id !== 'russia').flatMap(f=>f.outline);
   const allPoints = boxPts.concat(eventPts).length ? boxPts.concat(eventPts) : fronts.flatMap(f=>f.outline);
   map.fitBounds(L.latLngBounds(allPoints), { padding:[40,40] });
@@ -12085,7 +12139,7 @@ function setActiveFront(id){
   EVENTS.forEach((ev,i)=>{
     if((activeFront==="all" || ev.front===activeFront) &&
        dateMatches(ev.date) &&
-       markerRefs[i]) markerRefs[i].addTo(map);
+       markerRefs[i]) evMarkersAdd(i);
   });
 
   renderTabs();
@@ -12124,8 +12178,8 @@ function updateMarkerVisibility(){
     const inDate = dateMatches(ev.date);
     const matches = inFront && inDate && (!activeTag || (ev.tags||[]).includes(activeTag));
     const onMap = map.hasLayer(markerRefs[i]);
-    if(matches && !onMap) markerRefs[i].addTo(map);
-    if(!matches && onMap) map.removeLayer(markerRefs[i]);
+    if(matches && !onMap) evMarkersAdd(i);
+    if(!matches && onMap) evMarkersRemove(i);
   });
 }
 
@@ -12154,9 +12208,12 @@ function evToLbRecord(ev){
   if(ev.geo){
     const main = Array.isArray(ev.media) ? ev.media.slice() : [];
     const photos = (Array.isArray(ev.geoMedia) ? ev.geoMedia : []).filter(Boolean);
+    /* GEOLOC-v1: locs[0] is the main geolocation, the rest are ev.geoMore; every one has its own photos and source */
+    const locs = [{ coords: ev.geo, src: ev.geoSrc || '', photos: photos, stored: photos.length > 0 }]
+      .concat(evMore(ev).map(g=>{ const ph = (Array.isArray(g.media) ? g.media : []).filter(Boolean); return { coords: g.geo, src: g.src || '', photos: ph, stored: ph.length > 0 }; }));
     rec._geo = { coords: ev.geo, src: ev.geoSrc || '', extra: (ev.extraSrc || []).filter(Boolean),
-                 main: ev.mainSrc || ev.sourceUrl || '', n: main.length, photos: photos, stored: photos.length > 0 };
-    rec.media = main.concat(photos);
+                 main: ev.mainSrc || ev.sourceUrl || '', n: main.length, photos: photos, stored: photos.length > 0, locs: locs };
+    rec.media = main.concat.apply(main, locs.map(l=> l.photos));
     rec.text = evGeoInfoHtml(ev);
   }
   return rec;
@@ -12278,7 +12335,7 @@ function eventCardHTML(ev){
     </div>
     <div class="event-type" style="border-color:${TYPE_COLORS[ev.type]||'var(--line)'};color:${TYPE_COLORS[ev.type]||'var(--text-dim)'}">${esc(ev.type)}</div>
     ${opHtml}
-    ${ev.geo ? `<div class="event-geo">● GEOLOCATED</div>`
+    ${ev.geo ? `<div class="event-geo">● GEOLOCATED${evPoints(ev).length > 1 ? ' · ' + evPoints(ev).length + ' POINTS' : ''}</div>`
              : `<div class="event-geo event-nogeo">○ NO LOCATION — panel only</div>`}
     ${evMed.length ? `<div class="event-mediacount">▣ ${evMed.length} MEDIA</div>` : ``}
     ${evMedHtml}
@@ -12347,7 +12404,8 @@ function selectEvent(i, fromMap){
     if(!fromMap && card.scrollIntoView) card.scrollIntoView({behavior:'smooth', block:'center'});
   }
   if(ev.geo && !fromMap){
-    map.flyTo(ev.geo, 10, { duration:0.6 });
+    if(evPoints(ev).length > 1) map.flyToBounds(L.latLngBounds(evPoints(ev)), { maxZoom:10, padding:[60,60], duration:0.6 });   /* GEOLOC-v1 */
+    else map.flyTo(ev.geo, 10, { duration:0.6 });
     setTimeout(()=> markerRefs[i].openPopup(), 650);
   }
 }
@@ -21904,6 +21962,10 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
             + '<b>FETCH FROM GEO SOURCE</b> does that with the “Geolocation source” field above. '
             + 'Shown at the bottom when the geolocated event is enlarged. '
             + 'Left empty, an X geolocation source link is read automatically when the event is enlarged.'},
+        {k:'_geolocs', l:'More geolocations', type:'geolocs',
+         hint:'Optional. An event can have several geolocated points. Paste the link of each geolocation post: its <b>photos</b> and its '
+            + '<b>coordinates</b> are read from the post (type the coordinates if the post has none). Every location is its own point on the map. '
+            + 'If the event has no main location yet, the first link becomes it.'},
         {k:'extraSrc', l:'Extra sources', type:'area',
          ph:'https://…\nhttps://…\nhttps://…',
          hint:'Optional. <b>One link per line.</b> Secondary sources that strengthen '
@@ -21996,6 +22058,13 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
     return [la, ln];
   }
 
+  /* distance between two [lat, lon] points in km */
+  function edKm(a, b){
+    const R = 6371, r = Math.PI / 180, dLa = (b[0] - a[0]) * r, dLo = (b[1] - a[1]) * r;
+    const h = Math.sin(dLa / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dLo / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }
+
   /* "2026-10-01" -> "1 Oct 2026" — used to give a freshly date2-picked
      value the same short English display style as the rest of the feed. */
   function edPrettyDate(iso){
@@ -22013,6 +22082,7 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
   let edQuery = '';
   let edMedia = [];
   let edGeo = [];   /* GEOLB-v1: geolocation photos of the event being edited */
+  let edGeoMore = [];   /* GEOLOC-v1: extra geolocations of the event being edited: {src, coord, media[]} */
   let edThread = [];   /* THREAD-v1: Desk — the posts AFTER the first one: [{text, media:[url], link, date}] */
 
   /* dar ekran mı? matchMedia yoksa innerWidth'e düş */
@@ -22074,7 +22144,7 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
       + `<div class="ed-tab ${edTab==='frontline'?'on':''}" data-e="frontline">FRONT LINE</div>`
       + `<div class="ed-tab ${edTab==='areas'?'on':''}" data-e="areas">AREAS</div>`;
     tabs.querySelectorAll('.ed-tab').forEach(t=> t.addEventListener('click', ()=>{
-      edTab = t.dataset.e; edEditIndex = null; edMedia = []; edGeo = []; edThread = []; buildEditor();
+      edTab = t.dataset.e; edEditIndex = null; edMedia = []; edGeo = []; edGeoMore = []; edThread = []; buildEditor();
     }));
     if(edTab === 'frontline'){ edFrontline(); return; }
     if(edTab === 'areas'){ edAreas(); return; }
@@ -22667,6 +22737,15 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
             <div class="ed-thread" id="ed-thread"></div>
             ${f.hint?`<div class="ed-hint">${f.hint}</div>`:''}</div>`;
         }
+        if(f.type === 'geolocs'){
+          return `<div class="ed-f">${lab}
+            <div id="ed-gl"></div>
+            <div class="ed-row" style="margin-top:6px;">
+              <input type="text" id="ed-gl-url" placeholder="https://… (a geolocation post link)" autocomplete="off" spellcheck="false">
+              <button class="ed-btn" id="ed-gl-add">ADD LOCATION</button>
+            </div>
+            ${f.hint?`<div class="ed-hint">${f.hint}</div>`:''}</div>`;
+        }
         if(f.type === 'geophotos'){
           return `<div class="ed-f">${lab}
             <div class="ed-media" id="ed-geo"></div>
@@ -22856,6 +22935,18 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
         if(p.kind === 'media-video' || p.kind === 'invalid'){ toast('Not an image or a post link'); return 0; }
         toast('Fetching photos from the link…');
         const res = await FLink.resolve(u);
+        if(!(res && res.ok)){ toast('Could not read the link: ' + ((res && res.error) || 'failed')); return -1; }
+        /* GEOLOC-v1: the post's coordinates go to the Coordinates field when it is empty; a different value is only reported */
+        let coNote = '';
+        if(res.coords){
+          const cf = document.querySelector('#ed-form [data-k="coord"]');
+          const cur = cf ? edCoord(cf.value) : null;
+          if(cf && !cf.value.trim()){ edPut('coord', res.coords[0] + ', ' + res.coords[1], 'coordinates', []); coNote = ' · coordinates filled'; }
+          else if(cur){
+            const km = edKm(cur, res.coords);
+            coNote = km < 0.15 ? ' · coordinates match the form' : ' · the post says ' + res.coords[0].toFixed(5) + ', ' + res.coords[1].toFixed(5) + ' — ' + (km < 10 ? Math.round(km * 1000) + ' m' : km.toFixed(1) + ' km') + ' from the Coordinates field';
+          }
+        } else coNote = ' · no coordinates in the post';
         const imgs = (res && res.ok ? (res.media||[]) : []).filter(m=> m && m.url && m.kind === 'image' && !m.poster);
         const stable = res && (res.platform === 'x' || res.platform === 'youtube' || res.platform === 'media');
         let n = 0;
@@ -22869,7 +22960,7 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
           }
           if(add(val)) n++;
         }
-        toast(n ? n + ' geolocation photo' + (n>1?'s':'') + ' added' : (imgs.length ? 'Already added' : 'No photos found in that link'));
+        toast((n ? n + ' geolocation photo' + (n>1?'s':'') + ' added' : (imgs.length ? 'Already added' : 'No photos found in that link')) + coNote);
         return n;
       };
       const urlEl = document.getElementById('ed-geo-url');
@@ -22893,7 +22984,92 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
           try { add(await edShrinkImage(f)); } catch(err){ toast('Could not read ' + f.name); }
         }
       });
-      window.__flEdGeo = { get:()=> edGeo.slice(), set:a=>{ edGeo = Array.isArray(a) ? a.slice() : []; draw(); }, add:add };
+      window.__flEdGeo = { get:()=> edGeo.slice(), set:a=>{ edGeo = Array.isArray(a) ? a.slice() : []; draw(); }, add:add, fromLink:fromLink };
+    })();
+
+    /* GEOLOC-v1: more geolocations — each one is a post link with its own photos and its own point on the map */
+    (function(){
+      const host = document.getElementById('ed-gl');
+      if(!host) return;
+      const info = g=>{
+        const c = edCoord(g.coord);
+        return c ? '✓ ' + c[0].toFixed(5) + ', ' + c[1].toFixed(5) + ' — shown as its own point on the map'
+                 : (g.coord ? '✕ cannot read these coordinates' : 'No coordinates found in the post — type them (e.g. 48.35, 37.19).');
+      };
+      const draw = ()=>{
+        host.innerHTML = edGeoMore.length ? edGeoMore.map((g,i)=>`
+          <div class="edgl" data-gi="${i}">
+            <div class="edgl-h"><b>LOCATION ${i+2}</b><span class="edgl-x" data-glx="${i}" title="Remove this location">✕</span></div>
+            <input type="text" data-glf="src" placeholder="https://… (geolocation post)" value="${edEsc(g.src)}" autocomplete="off" spellcheck="false">
+            <input type="text" data-glf="coord" placeholder="48.35, 37.19" value="${edEsc(g.coord)}" autocomplete="off" spellcheck="false">
+            <div class="ed-hint edgl-info">${edEsc(info(g))}</div>
+            <div class="ed-media">${(g.media || []).map((m,k)=>`
+              <div class="edm">
+                ${ flMediaKind(m)==='video' ? `<video src="${safeUrl(m)}" muted></video>` : `<img src="${safeUrl(m)}" alt="">` }
+                <span class="edm-x" data-gpx="${i}:${k}">✕</span><span class="edm-n">${k+1}</span>
+              </div>`).join('') || '<div class="ed-hint" style="margin:0;">No photos.</div>'}</div>
+          </div>`).join('')
+          : '<div class="ed-hint" style="margin:0;">No extra locations yet.</div>';
+        host.querySelectorAll('[data-glx]').forEach(b=> b.addEventListener('click', ()=>{ edGeoMore.splice(+b.dataset.glx, 1); draw(); }));
+        host.querySelectorAll('[data-gpx]').forEach(b=> b.addEventListener('click', ()=>{
+          const [i, k] = b.dataset.gpx.split(':').map(Number); if(edGeoMore[i]) edGeoMore[i].media.splice(k, 1); draw(); }));
+        host.querySelectorAll('.edgl').forEach(card=>{
+          const g = edGeoMore[+card.dataset.gi];
+          card.querySelectorAll('[data-glf]').forEach(inp=> inp.addEventListener('input', ()=>{
+            g[inp.dataset.glf] = inp.value.trim();
+            if(inp.dataset.glf === 'coord'){ const h = card.querySelector('.edgl-info'); if(h) h.textContent = info(g); }
+          }));
+        });
+      };
+      draw();
+      const urlEl = document.getElementById('ed-gl-url');
+      const addBtn = document.getElementById('ed-gl-add');
+      const addLink = async raw=>{
+        const u = String(raw || '').trim();
+        if(!/^https?:/i.test(u)){ toast('Paste the link of a geolocation post (https://…)'); return; }
+        if(edGeoMore.some(g=> g.src === u) || (document.querySelector('#ed-form [data-k="geoSrc"]') || {}).value === u){ toast('That geolocation is already on the form'); return; }
+        const priC = document.querySelector('#ed-form [data-k="coord"]');
+        const priEmpty = !(priC && priC.value.trim());
+        if(priEmpty){
+          /* no main location yet: the first geolocation link becomes it (same as FETCH FROM GEO SOURCE) */
+          const gi = document.querySelector('#ed-form [data-k="geoSrc"]');
+          if(gi && !gi.value.trim()) gi.value = u;
+          const n = await window.__flEdGeo.fromLink(u);
+          if(n !== -1){
+            const pc = document.querySelector('#ed-form [data-k="coord"]');
+            if(!(pc && pc.value.trim())) toast('Link set as the main geolocation source — the post has no coordinates, type them in Coordinates');
+          }
+          return;
+        }
+        addBtn.disabled = true;
+        try {
+          toast('Reading the geolocation post…');
+          const res = await FLink.resolve(u);
+          if(!res || !res.ok){ toast('Could not read the link: ' + ((res && res.error) || 'failed')); return; }
+          const imgs = (res.media || []).filter(m=> m && m.url && m.kind === 'image' && !m.poster);
+          const stable = res.platform === 'x' || res.platform === 'youtube' || res.platform === 'media';
+          const media = [];
+          for(const m of imgs){
+            let val = m.url;
+            if(!stable){
+              try { const blob = await FLink.fetchImageBlob(m.url); val = await edShrinkImage(new File([blob], 'geo-photo', { type:blob.type }), 1280, 0.78); } catch(e){}
+            }
+            if(media.indexOf(val) < 0) media.push(val);
+          }
+          const co = res.coords ? res.coords[0] + ', ' + res.coords[1] : '';
+          edGeoMore.push({ src:u, coord:co, media:media });
+          draw();
+          toast('Location ' + (edGeoMore.length + 1) + ' added — ' + (co ? 'coordinates found' : 'no coordinates in the post, type them') + ', ' + media.length + ' photo' + (media.length === 1 ? '' : 's'));
+        } catch(e){ toast('Could not read the link'); }
+        finally { addBtn.disabled = false; }
+      };
+      const doAdd = async ()=>{
+        const toks = urlEl.value.split(/\s+/).filter(Boolean); urlEl.value = '';
+        for(const t of toks) await addLink(t);
+      };
+      addBtn.addEventListener('click', doAdd);
+      urlEl.addEventListener('keydown', e=>{ if(e.key === 'Enter'){ e.preventDefault(); doAdd(); } });
+      window.__flEdGeoMore = { get:()=> edGeoMore.slice(), set:a=>{ edGeoMore = Array.isArray(a) ? a.slice() : []; draw(); }, add:addLink };
     })();
 
     /* THREAD-v1: Desk thread editor (posts after the first one) */
@@ -23078,7 +23254,7 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
       inp.addEventListener('blur', ()=> setTimeout(()=> box.classList.remove('on'), 120));
     });
 
-    edLinkBind(); edTgBind();
+    edLinkBind(); edTgBind(); edTypeBind();
     document.getElementById('ed-save').addEventListener('click', edSave);
     const cx = document.getElementById('ed-cancel');
     if(cx) cx.addEventListener('click', ()=>{ edEditIndex = null; buildEditor(); });
@@ -23094,10 +23270,30 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
     if(cf && (cf.req || v[cf.k]) && !edCoord(v[cf.k])){
       toast(s.en?'Could not read coordinates — e.g. 48.35, 37.19':'Koordinat okunamadı — ör: 48.35, 37.19'); return; }
 
+    /* GEOLOC-v1: every extra geolocation needs readable coordinates (it is a point on the map) */
+    const geoMore = [];
+    if(s.store === 'events'){
+      for(let i = 0; i < edGeoMore.length; i++){
+        const g = edGeoMore[i], c = edCoord(g.coord);
+        if(!c){ toast('Location ' + (i + 2) + ' has no readable coordinates — type them or remove it'); return; }
+        geoMore.push({ geo:c, src:g.src || '', media:(g.media || []).slice() });
+      }
+    }
+
     edTakeOver(s);
     const rec = s.build(v);
     if(edMedia.length) rec.media = edMedia.slice();
     if(s.store === 'events' && edGeo.length) rec.geoMedia = edGeo.slice();   /* GEOLB-v1 */
+    if(s.store === 'events' && geoMore.length){
+      /* no main location typed: the first extra one becomes the main one, so the event always has a main point */
+      if(!rec.geo){
+        const f = geoMore.shift();
+        rec.geo = f.geo;
+        if(!rec.geoSrc) rec.geoSrc = f.src;
+        if(f.media.length) rec.geoMedia = (rec.geoMedia || []).concat(f.media);
+      }
+      if(geoMore.length) rec.geoMore = geoMore;                              /* GEOLOC-v1 */
+    }
     if(s.store === 'desk' && edThread.length){                               /* THREAD-v1 */
       const th = edThread.map(t=> ({ text:String(t.text || '').trim(), media:(t.media || []).slice(), link:t.link || '', date:t.date || '' }))
         .filter(t=> t.text || t.media.length);
@@ -23131,7 +23327,7 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
     flSaveUser();
     s.refresh();
     const wasEdit = edEditIndex !== null;
-    edEditIndex = null; edMedia = []; edGeo = []; edThread = [];
+    edEditIndex = null; edMedia = []; edGeo = []; edGeoMore = []; edThread = [];
     toast(s.en ? (wasEdit?'Updated':'Published') : (wasEdit?'Updated':'Published'));
     buildEditor();
     edScrollTop();   /* mobilde form ekranın üstüne dönsün */
@@ -23559,6 +23755,7 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
       if(res.coords) edPut('coord', res.coords[0] + ', ' + res.coords[1], 'coordinates', filled);
       if(mi && mi.videos) edPut('video', '1', 'video flag', filled);
       try { res.notes = (res.notes || []).concat(edUnitFill(res, filled)); } catch(e){}
+      try { res.notes = (res.notes || []).concat(edTypeFill(res, filled)); } catch(e){}   /* EVTYPE-v1 */
     } else if(edTab === 'desk'){
       /* the handle's change event must not run the "as chosen before" fill yet — the link's own platform goes first */
       edAutoBusy = true;
@@ -23735,6 +23932,103 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
     }
     return 'recognised from “' + d.raw + '” in the post' + (d.how === 'nick' ? ' (unit nickname)' : '') + (d.guess ? ' — number only, check it' : '')
       + (d.battalion ? ' · battalion “' + d.battalion + '” of ' + d.parentLabel : '');
+  }
+
+  /* EVTYPE-v1: Event type guessed from the text of the pasted link (title + text, original language too).
+     The WEAPON / method comes first, then what was hit, then ground-operation words; the first rule that matches
+     wins. Nothing matches = the field is left alone. It is a suggestion: the report says which words decided it. */
+  const ED_TYPE_RULES = [
+    ['fiber-optic fpv', /fib(?:er|re)[\s-]?optic|optical[\s-]fib(?:er|re)|оптоволок|оптоволокон|волоконно[\s-]?оптич/i],
+    ['aircraft shot down', /(?:aircraft|jet|fighter|plane|su-\d\d|mig-\d\d|tu-\d\d|a-50|il-76)[^.\n]{0,50}(?:shot down|downed|brought down|destroyed in the air)|(?:shot down|downed)[^.\n]{0,40}(?:aircraft|jet|fighter|plane|su-\d\d|mig-\d\d)|збит\w*\s+(?:літак|су-|міг-)|сбит\w*\s+(?:самол[её]т|су-|миг-)/i],
+    ['helicopter shot down', /helicopter[^.\n]{0,50}(?:shot down|downed|brought down)|(?:shot down|downed)[^.\n]{0,40}helicopter|(?:ka|mi)-\d{1,2}[^.\n]{0,40}(?:shot down|downed)|збит\w*\s+вертол|сбит\w*\s+вертол/i],
+    ['usv attack', /\busvs?\b|sea drone|naval drone|magura|sea baby|морськ\w+\s+дрон|безеки?паж\w+\s+катер|безэкипаж\w+\s+катер/i],
+    ['ugv operation', /\bugvs?\b|ground (?:robot|drone)|robotic (?:ground )?(?:vehicle|platform)|наземн\w+\s+(?:робот|дрон)|\bНРК\b/i],
+    ['ship hit', /(?:landing ship|warship|corvette|frigate|patrol (?:boat|ship)|missile (?:boat|ship)|submarine|tugboat)[^.\n]{0,60}(?:hit|struck|destroyed|sunk|damaged)|(?:hit|struck|sank|sunk)[^.\n]{0,40}(?:landing ship|warship|corvette|frigate|patrol boat)/i],
+    ['fpv strike', /\bfpv\b|\bфпв\b|fpv-?дрон/i],
+    ['loitering munition', /loitering (?:munition|drone)|\blancet\b|ланцет|блукаюч\w+\s+боєприпас|барражир\w+\s+боеприпас/i],
+    ['mid-range strike', /mid(?:dle)?[\s-]range|medium[\s-]range (?:strike|drone|uav|fpv)|середн\w+\s+дальн|средн\w+\s+дальн/i],
+    ['drone bombing', /(?:drone|uav|quadcopter|multicopter|bomber)[^.\n]{0,40}(?:dropp?(?:ed|ing)?|bomb(?:ed|ing)?)\b|(?:drop(?:ped|ping)?|bombing)[^.\n]{0,30}(?:from|by|with)\s+(?:a\s+)?(?:drone|uav|quadcopter)|скидан\w*|скидом|скидува\w*|сброс\w*\s+(?:боеприпас|с\s+дрон)/i],
+    ['drone shootdown', /(?:drones?|uavs?|shahed|geran|gerbera)s?[^.\n]{0,50}(?:shot down|downed|neutrali[sz]ed|intercepted|destroyed in the air)|(?:shot down|downed|neutrali[sz]ed|intercepted)[^.\n]{0,40}(?:drones?|uavs?|shahed|geran)|збит\w*\s+(?:бпла|дрон|шахед)|сбит\w*\s+(?:бпла|дрон|шахед)/i],
+    ['missile intercept', /(?:missile|iskander|kinzhal|kalibr|kh-\d\d)s?[^.\n]{0,50}(?:shot down|intercepted|downed|neutrali[sz]ed)|(?:shot down|intercepted|downed)[^.\n]{0,40}missile|збит\w*\s+ракет|сбит\w*\s+ракет|перехопил\w*\s+ракет/i],
+    ['interceptor', /interceptor|перехоплювач|перехватчик/i],
+    ['counter-battery', /counter[\s-]?batter|контр-?батар/i],
+    ['mlrs strike', /\bmlrs\b|himars|\bgrad\b|smerch|uragan|tornado-?[sg]|\bbm-?21\b|рсзв|\bград\b|смерч|ураган/i],
+    ['glide bomb', /glide[\s-]?bombs?|\bkab-?\d+|guided (?:aerial |aviation )?bomb|\bjdam\b|\bумпк\b|\bкаб-?\d+|керов\w+\s+авіаційн\w+\s+бомб|управляем\w+\s+авиабомб/i],
+    ['ballistic missile', /ballistic|iskander-?m|kinzhal|\bkn-?23\b|балістич|баллистич|іскандер-?м|искандер-?м|кинжал/i],
+    ['cruise missile', /cruise missile|kalibr|\bkh-?\d{2}\b|storm shadow|\bscalp\b|neptune|крилат\w+\s+ракет|крылат\w+\s+ракет|калібр|калибр/i],
+    ['missile strike', /missile (?:strike|attack|hit|barrage)|ракетн\w+\s+(?:удар|атак)/i],
+    ['deep strike', /deep[\s-]strike|long[\s-]range (?:strike|drone attack)|глибок\w+\s+удар|глубок\w+\s+удар/i],
+    ['airstrike', /air ?strikes?|aerial (?:strike|bombing)|bombing run|авіаудар|авиаудар|авиационн\w+\s+удар/i],
+    ['mortar', /mortar|міномет|миномёт|миномет/i],
+    ['artillery', /artillery|howitzer|self-propelled|\bsph\b|caesar|\bm777\b|\bmsta\b|akatsiya|gvozdika|\bd-30\b|\b2s\d{1,2}\b|гаубиц|артилер|артиллер|\bсау\b/i],
+    ['sabotage', /sabotage|arson|derail(?:ed|ment)|blew up|blown up|саботаж|диверс|підпал|поджог/i],
+    ['uav attack', /\buavs?\b|\bdrones?\b|shahed|geran|gerbera|\bбпла\b|дрон|шахед|герань/i],
+    ['ammo depot hit', /ammo(?:nition)?[\s-](?:depot|dump|warehouse|storage)|arsenal|склад\w*\s+боєприпас|склад\w*\s+боеприпас/i],
+    ['fuel depot hit', /fuel (?:depot|storage|tank)|oil (?:depot|storage)|нафтобаз|склад\w*\s+пальн|склад\w*\s+ГСМ|нефтебаз/i],
+    ['refinery strike', /refinery|\bнпз\b|нафтопереробн|нефтеперераб/i],
+    ['airfield strike', /airfield|air ?base|аеродром|аэродром/i],
+    ['command post hit', /command post|\bcp\b|headquarters|\bhq\b|командн\w+\s+пункт|\bкп\b|\bштаб\b/i],
+    ['energy infrastructure hit', /substation|power plant|thermal power|energy infrastructure|power grid|підстанц|подстанц|\bтец\b|\bтес\b|електростанц|электростанц/i],
+    ['defence industry hit', /defen[cs]e (?:plant|factory|industry|enterprise)|(?:ammunition|munitions|drone|missile) (?:plant|factory)|оборонн\w+\s+(?:завод|підприємств|предприят)/i],
+    ['bridge / rail hit', /\bbridge\b|railway|rail ?(?:road|line|way)|locomotive|залізнич|железнодорож|\bміст\b|\bмост\b/i],
+    ['radar / ew hit', /\bradar\b|electronic warfare (?:system|station)|\bew (?:system|station)\b|\bрлс\b|радіолокац|радиолокац/i],
+    ['armor hit', /\btanks?\b|\bt-(?:62|64|72|80|90)\b|\bbmp\b|\bbtr\b|\bbmd\b|\bifv\b|\bapc\b|armou?red|\bтанк|\bбмп\b|\bбтр\b|\bбмд\b|бронетехн|бронемашин/i],
+    ['logistics hit', /logistic|supply (?:route|line|truck)|fuel truck|\btrucks?\b|\bural\b|\bkamaz\b|логіст|логист|вантажів|грузов/i],
+    ['vehicle hit', /vehicle|\bcars?\b|motorcycle|\bbuggy\b|\batv\b|автомобіл|автомобил|\bмашин|мотоцикл/i],
+    ['personnel hit', /personnel|infantry|soldiers?|troops|servicemen|піхот|пехот|особов\w+\s+склад|живу\s+силу|живую\s+силу|солдат/i],
+    ['pow / surrender', /prisoners? of war|\bpows?\b|surrender(?:ed)?|taken prisoner|captured (?:soldiers?|troops|servicemen)|в\s+полон|в\s+плен/i],
+    ['equipment captured', /captured (?:equipment|tank|vehicle|apc|ifv|weapons?)|trophy|trophies|трофе/i],
+    ['settlement captured', /captured (?:the )?(?:village|town|settlement|city)|(?:village|town|settlement) (?:was )?captured|взят\w+\s+(?:село|селище|місто|поселок|город)/i],
+    ['settlement liberated', /liberat(?:ed|ion)|звільн\w+|освобожд\w+/i],
+    ['counterattack', /counter[\s-]?attack|контратак|контрнаступ/i],
+    ['assault', /assault|stormed?|storming|штурм/i],
+    ['breakthrough', /breakthrough|broke through|прорив|прорыв/i],
+    ['encirclement', /encircle|surround(?:ed|ing)|оточен|окружен/i],
+    ['withdrawal', /withdr[ae]w|retreat|відхід|відступ|отход|отступ/i],
+    ['infiltration', /infiltrat|просочув|просачив/i],
+    ['advance', /advanc|просув|продвиж/i],
+    ['raid', /\braid\b|рейд/i],
+    ['ambush', /ambush|засад/i],
+    ['fortification', /fortification|trench|dugout|bunker|укріплен|окоп|блиндаж|бліндаж/i],
+    ['rotation', /rotation|ротаці|ротаци/i],
+    ['evacuation', /evacuat|евакуац|эвакуац/i],
+    ['electronic warfare', /electronic warfare|jamm(?:er|ing)|\bреб\b|\bрэб\b/i],
+    ['recon', /reconnaissance|\brecon\b|розвідк|разведк/i],
+    ['civilian impact', /civilian|мирн\w+\s+(?:жител|насел)|цивільн|гражданск/i],
+    ['casualty report', /casualt|killed in action|\bkia\b|втрат|потер/i],
+    ['official statement', /general staff|ministry of defen[cs]e|official statement|генштаб|генеральн\w+\s+штаб|минобороны|міноборони/i],
+    ['info operation', /disinformation|fake news|propaganda|дезінформ|дезинформ|фейк|пропаганд/i],
+  ];
+  function edTypeGuess(res){
+    const txt = [res.title, res.text, res.titleOrig, res.textOrig].filter(Boolean).join('\n').slice(0, 1600);
+    if(!txt.trim()) return null;
+    for(const r of ED_TYPE_RULES){
+      const m = r[1].exec(txt);
+      if(m) return { type:r[0], why:m[0].trim().replace(/\s+/g, ' ').slice(0, 40) };
+    }
+    return null;
+  }
+  function edTypeFill(res, filled){
+    const notes = [];
+    const el = document.querySelector('#ed-form [data-k="type"]');
+    if(!el || el.tagName !== 'SELECT') return notes;
+    const g = edTypeGuess(res);
+    if(!g){ notes.push('Event type: nothing in the text points to one — choose it by hand.'); return notes; }
+    if(!Array.prototype.some.call(el.options, o=> o.value === g.type)) return notes;
+    if(edEditIndex !== null || el.dataset.touched === '1'){
+      notes.push('Event type: the text suggests “' + g.type + '” (“' + g.why + '”) — the field was already set, so it was left alone.');
+      return notes;
+    }
+    el.value = g.type;
+    el.dispatchEvent(new Event('change', { bubbles:true }));
+    filled.push('event type');
+    notes.push('Event type: ' + g.type + ' — the text says “' + g.why + '”. Check it.');
+    return notes;
+  }
+  /* a choice made by hand is never replaced by a later fetch */
+  function edTypeBind(){
+    const el = document.querySelector('#ed-form [data-k="type"]');
+    if(el && el.tagName === 'SELECT') el.addEventListener('change', e=>{ if(e.isTrusted) el.dataset.touched = '1'; });
   }
 
   function edUnitFill(res, filled){
@@ -24125,7 +24419,7 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
   async function edTgUse(id, tab){
     const d = FTg.drafts().find(x=> x.id === id);
     if(!d) return;
-    edTab = tab; edEditIndex = null; edMedia = []; edGeo = []; edThread = [];
+    edTab = tab; edEditIndex = null; edMedia = []; edGeo = []; edGeoMore = []; edThread = [];
     buildEditor(); edScrollTop();
     const tab0 = edTab;
     const alive = ()=> edTab === tab0 && !!document.getElementById('ed-link-status');
@@ -24294,6 +24588,7 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
       const rec = s.target()[edEditIndex];
       edMedia = (rec && rec.media) ? rec.media.slice() : [];
       edGeo = (rec && Array.isArray(rec.geoMedia)) ? rec.geoMedia.slice() : [];
+      edGeoMore = (rec && Array.isArray(rec.geoMore)) ? rec.geoMore.filter(g=> g && Array.isArray(g.geo)).map(g=> ({ src:g.src || '', coord:g.geo[0] + ', ' + g.geo[1], media:Array.isArray(g.media) ? g.media.slice() : [] })) : [];
       edThread = (rec && Array.isArray(rec.thread)) ? JSON.parse(JSON.stringify(rec.thread)) : [];
       edForm(); edList();
       edScrollTop();
@@ -24305,7 +24600,7 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
       s.target().splice(i,1);
       FL_USER[s.store] = s.target().slice();
       flSaveUser();
-      if(edEditIndex === i){ edEditIndex = null; edMedia = []; edGeo = []; edThread = []; }
+      if(edEditIndex === i){ edEditIndex = null; edMedia = []; edGeo = []; edGeoMore = []; edThread = []; }
       s.refresh(); toast(s.en?'Deleted':'Deleted'); buildEditor();
     }));
   }
@@ -26130,51 +26425,67 @@ function lbNavVis(){
   document.getElementById('lb-prev').style.display = n > 1 ? '' : 'none';
   document.getElementById('lb-next').style.display = n > 1 ? '' : 'none';
 }
-function lbGeoApply(d, imgs){
+function lbGeoRebuild(d){
+  const g = d._geo;
+  d.media = d.media.slice(0, g.n).concat.apply(d.media.slice(0, g.n), g.locs.map(l=> l.photos));
+  g.photos = g.locs[0].photos;
+}
+function lbGeoApply(d, imgs, j){
   if(!d || !d._geo) return;
-  d._geo.busy = false; d._geo.auto = true; d._geo.photos = imgs.slice();
-  d.media = d.media.slice(0, d._geo.n).concat(imgs);
+  const l = d._geo.locs[j || 0];
+  l.busy = false; l.auto = true; l.photos = imgs.slice();
+  d._geo.busy = false; d._geo.auto = true;
+  lbGeoRebuild(d);
   if(lbRec === d){ lbRenderGeo(); lbNavVis(); }
 }
 function lbGeoAuto(d){
   const g = d && d._geo;
-  if(!g || g.stored || g.auto || g.busy || !g.src || typeof FLink === 'undefined') return;
-  let kind = ''; try { kind = FLink.parse(g.src).kind; } catch(e){}
-  if(kind !== 'x') return;
-  if(flGeoCache.has(g.src)){ lbGeoApply(d, flGeoCache.get(g.src)); return; }
-  g.busy = true;
-  Promise.resolve().then(()=> FLink.resolve(g.src)).then(res=>{
-    const imgs = (res && res.ok ? (res.media || []) : [])
-      .filter(m=> m && m.url && m.kind === 'image' && !m.poster).map(m=> m.url);
-    flGeoCache.set(g.src, imgs); lbGeoApply(d, imgs);
-  }).catch(()=>{ flGeoCache.set(g.src, []); lbGeoApply(d, []); });
+  if(!g || typeof FLink === 'undefined') return;
+  g.locs.forEach((l, j)=>{
+    if(l.stored || l.auto || l.busy || !l.src) return;
+    let kind = ''; try { kind = FLink.parse(l.src).kind; } catch(e){}
+    if(kind !== 'x') return;
+    if(flGeoCache.has(l.src)){ lbGeoApply(d, flGeoCache.get(l.src), j); return; }
+    l.busy = true;
+    Promise.resolve().then(()=> FLink.resolve(l.src)).then(res=>{
+      const imgs = (res && res.ok ? (res.media || []) : [])
+        .filter(m=> m && m.url && m.kind === 'image' && !m.poster).map(m=> m.url);
+      flGeoCache.set(l.src, imgs); lbGeoApply(d, imgs, j);
+    }).catch(()=>{ flGeoCache.set(l.src, []); lbGeoApply(d, [], j); });
+  });
 }
 function lbRenderGeo(){
   const el = document.getElementById('lb-geo'); if(!el) return;
   const d = lbRec;
   if(!d || d._kind !== 'event' || !d._geo){ el.hidden = true; el.innerHTML = ''; return; }
-  const g = d._geo, c = g.coords;
-  const co = (+c[0]).toFixed(5) + ', ' + (+c[1]).toFixed(5);
-  const gm = 'https://maps.google.com/?q=' + (+c[0]) + ',' + (+c[1]) + '&t=k&z=17';
-  const ph = g.photos.map((m,i)=>
-    `<span class="lt ${lbIdx === g.n + i ? 'on' : ''}" data-gi="${i}">${
-      flMediaKind(m) === 'video' ? `<video src="${safeUrl(m)}" muted></video>` : `<img src="${safeUrl(m)}" alt="">`}</span>`).join('');
-  const phHtml = ph
-    ? ph + (g.auto && !g.stored ? '<div class="lg-note">PHOTOS FROM THE GEOLOCATION POST</div>' : '')
-    : g.busy ? '<div class="lg-empty">Fetching photos from the geolocation post…</div>'
-    : g.auto ? '<div class="lg-empty">No photo found in the geolocation post — see the links.</div>'
-    : '<div class="lg-empty">No geolocation photos attached to this event.</div>';
-  const links = [];
-  if(g.src) links.push(`<a href="${safeUrl(g.src)}" target="_blank" rel="noopener"><i>GEO SOURCE</i>${esc(lbLinkLabel(g.src))} ↗</a>`);
-  g.extra.forEach((u,i)=> links.push(`<a href="${safeUrl(u)}" target="_blank" rel="noopener"><i>EXTRA ${i+1}</i>${esc(lbLinkLabel(u))} ↗</a>`));
-  if(!links.length) links.push('<div class="lg-empty">No geolocation source link attached.</div>');
+  const g = d._geo, multi = g.locs.length > 1;
+  let off = g.n, html = '';
+  g.locs.forEach((l, j)=>{
+    const c = l.coords;
+    const co = (+c[0]).toFixed(5) + ', ' + (+c[1]).toFixed(5);
+    const gm = 'https://maps.google.com/?q=' + (+c[0]) + ',' + (+c[1]) + '&t=k&z=17';
+    const base = off; off += l.photos.length;
+    const ph = l.photos.map((m,i)=>
+      `<span class="lt ${lbIdx === base + i ? 'on' : ''}" data-gi="${base + i}">${
+        flMediaKind(m) === 'video' ? `<video src="${safeUrl(m)}" muted></video>` : `<img src="${safeUrl(m)}" alt="">`}</span>`).join('');
+    const phHtml = ph
+      ? ph + (l.auto && !l.stored ? '<div class="lg-note">PHOTOS FROM THE GEOLOCATION POST</div>' : '')
+      : l.busy ? '<div class="lg-empty">Fetching photos from the geolocation post…</div>'
+      : l.auto ? '<div class="lg-empty">No photo found in the geolocation post — see the links.</div>'
+      : '<div class="lg-empty">No geolocation photos attached to this event.</div>';
+    const links = [];
+    if(l.src) links.push(`<a href="${safeUrl(l.src)}" target="_blank" rel="noopener"><i>GEO SOURCE</i>${esc(lbLinkLabel(l.src))} ↗</a>`);
+    if(j === 0) g.extra.forEach((u,i)=> links.push(`<a href="${safeUrl(u)}" target="_blank" rel="noopener"><i>EXTRA ${i+1}</i>${esc(lbLinkLabel(u))} ↗</a>`));
+    if(!links.length) links.push('<div class="lg-empty">No geolocation source link attached.</div>');
+    html += (j ? '<div class="lg-sep"></div>' : '') +
+      `<div class="lg-h"><b>GEOLOCATION${multi ? ' ' + (j + 1) + '/' + g.locs.length : ''}</b><span class="lg-co">${esc(co)}</span>` +
+      `<a href="${safeUrl(gm)}" target="_blank" rel="noopener">OPEN IN GOOGLE MAPS ↗</a></div>` +
+      `<div class="lg-ph">${phHtml}</div><div class="lg-ln">${links.join('')}</div>`;
+  });
   el.hidden = false;
-  el.innerHTML =
-    `<div class="lg-h"><b>GEOLOCATION</b><span class="lg-co">${esc(co)}</span>` +
-    `<a href="${safeUrl(gm)}" target="_blank" rel="noopener">OPEN IN GOOGLE MAPS ↗</a></div>` +
-    `<div class="lg-ph">${phHtml}</div><div class="lg-ln">${links.join('')}</div>`;
+  el.innerHTML = html;
   el.querySelectorAll('[data-gi]').forEach(t=> t.addEventListener('click', ()=>{
-    lbIdx = g.n + (+t.dataset.gi); lbRender();
+    lbIdx = +t.dataset.gi; lbRender();
   }));
 }
 
@@ -26343,7 +26654,7 @@ function fsCardHtml(ev){
       </div>
       <div class="event-type" style="border-color:${TYPE_COLORS[ev.type]||'var(--line)'};color:${TYPE_COLORS[ev.type]||'var(--text-dim)'}">${esc(ev.type)}</div>
       ${opHtml}
-      ${ev.geo ? `<div class="event-geo">● GEOLOCATED</div>`
+      ${ev.geo ? `<div class="event-geo">● GEOLOCATED${evPoints(ev).length > 1 ? ' · ' + evPoints(ev).length + ' POINTS' : ''}</div>`
                : `<div class="event-geo event-nogeo">○ NO LOCATION</div>`}
       ${evMedHtml}
     </div>`;
@@ -26663,7 +26974,7 @@ function fsClose(){
 <script>
 /* PWA-v2: servis işçisi — yalnızca http(s) üzerinde (file:// ve DOWNLOAD SITE kopyasında devre dışı) */
 (function(){
-  var BUILD = '20261126-0320';
+  var BUILD = '20261126-1700';
   var live = ('serviceWorker' in navigator) && /^https?:$/.test(location.protocol);
   var reg = null, lastKick = 0;
   function ctl(){ return live ? navigator.serviceWorker.controller : null; }
