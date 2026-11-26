@@ -3294,7 +3294,7 @@
   .lb-close{ font-size:20px;color:#7d8a94;cursor:pointer;line-height:1;flex:none; }
   .lb-close:hover{ color:#fff; }
 
-  .lb-stage{ flex:1;display:flex;align-items:center;gap:10px;padding:16px 22px;min-height:0; }
+  .lb-stage{ flex:1;display:flex;align-items:center;gap:10px;padding:16px 22px;min-height:min(46vh,440px); }
   .lb-frame{
     flex:1;height:100%;display:flex;align-items:center;justify-content:center;
     background:#05090d;border:1px solid #1e262c;overflow:hidden;
@@ -3306,7 +3306,7 @@
   }
   .lb-nav:hover{ color:#fff;border-color:#c9a227; }
 
-  .lb-foot{ padding:12px 22px 18px;border-top:1px solid #1e262c; }
+  .lb-foot{ padding:12px 22px 18px;border-top:1px solid #1e262c;max-height:46vh;overflow-y:auto;flex:0 1 auto; }
   .lb-meta{ display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px; }
   .lb-meta span{
     font-size:8px;letter-spacing:1.2px;color:#9aa8b2;
@@ -3378,7 +3378,7 @@
     #amb-lb.lb-split .lb-stage{ grid-area:stage;padding:16px 12px 10px 22px; }
     #amb-lb.lb-split .lb-foot{ display:contents; }
     #amb-lb.lb-split .lb-thumbs{ grid-area:thumbs;padding:0 12px 16px 22px; }
-    #amb-lb.lb-split .lb-geo{ grid-area:geo;margin:0 22px 16px; }
+    #amb-lb.lb-split .lb-geo{ grid-area:geo;margin:0 22px 16px;max-height:28vh;overflow-y:auto; }
     #amb-lb.lb-split .lb-side{
       grid-area:side;display:flex;flex-direction:column;min-height:0;min-width:0;
       padding:16px 22px 18px 14px;border-left:1px solid #1e262c;
