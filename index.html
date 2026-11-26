@@ -1216,11 +1216,13 @@
   #skull-view .c2-r-line span{ font-size:14px;color:#d9d5cc; }
   #skull-view .c2-r-line b{ font-family:'Newsreader',Georgia,serif;font-weight:400;font-size:30px;color:#fff;font-variant-numeric:tabular-nums; }
   #skull-view .c2-r-sub{ font-size:12px;line-height:1.45;color:var(--c2-mut); }
-  #skull-view .c2-r-est{ display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-top:6px;padding-top:8px;border-top:1px dashed var(--c2-line2);font-size:13px;color:#d9d5cc; }
-  #skull-view .c2-r-est b{ font-family:'Newsreader',Georgia,serif;font-weight:400;font-size:24px;color:#d9d5cc; }
+  #skull-view .c2-r-block{ display:flex;flex-direction:column;gap:12px;border-top:1px solid var(--c2-line2);padding-top:14px; }
+  #skull-view .c2-r-block .c2-r-rows{ border-top:0;padding-top:0;gap:12px; }
+  #skull-view .c2-r-cap{ display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#d9d5cc; }
+  #skull-view .c2-r-cap small{ font-size:11px;letter-spacing:0;text-transform:none;color:var(--c2-mut); }
+  #skull-view .c2-r-leak .c2-r-line b{ font-size:24px;color:#d9d5cc; }
+  #skull-view .c2-r-leak .c2-r-row .c2-dot{ width:12px;height:12px;margin-top:7px; }
   #skull-view .c2-drawer, #skull-view .c2-result, #skull-view .c2-about-in{ background:#131314; }
-  #skull-view .c2-r-model{ display:flex;flex-direction:column;gap:8px;border-top:1px dashed var(--c2-line2);padding-top:14px; }
-  #skull-view .c2-r-model .c2-r-est{ margin:0;padding:0;border:0; }
   #skull-view .c2-drawer{ position:absolute;right:16px;top:80px;bottom:16px;z-index:6;box-sizing:border-box;width:360px;max-width:calc(100% - 32px);display:none;flex-direction:column; }
   #skull-view .c2-drawer.on{ display:flex; }
   #skull-view .c2-d-top{ display:flex;justify-content:space-between;align-items:center;padding:6px 6px 6px 16px;border-bottom:1px solid var(--c2-line2); }
@@ -1261,6 +1263,9 @@
   #skull-view .c2-fig-l{ font:600 12px/1.5 'Inter',system-ui,sans-serif;letter-spacing:.14em;color:var(--c2-mut);text-transform:uppercase; }
   #skull-view .c2-fig-n{ font-size:12px;color:var(--c2-mut);min-height:16px; }
   #skull-view .c2-bars{ display:flex;flex-direction:column;gap:20px;max-width:1000px; }
+  #skull-view .c2-years{ display:flex;flex-direction:column;gap:14px;max-width:1000px;margin-top:8px;padding-top:20px;border-top:1px solid var(--c2-line2); }
+  #skull-view .c2-years .c2-bars{ gap:14px; }
+  #skull-view .c2-years .c2-bar-l span{ font-size:13px; }
   #skull-view .c2-bar-row{ display:flex;flex-direction:column;gap:8px; }
   #skull-view .c2-bar-l{ display:flex;justify-content:space-between;gap:16px;font-size:14px;line-height:1.4; }
   #skull-view .c2-bar-l span{ color:#d9d5cc;text-transform:uppercase;letter-spacing:.05em; }
@@ -1330,6 +1335,7 @@
     #skull-view .c2-result{ left:10px;right:10px;top:auto;bottom:40px;width:auto;max-width:none;max-height:58%;padding:14px; }
     #skull-view .c2-r-area{ font-size:24px; }
     #skull-view .c2-r-line b{ font-size:26px; }
+    #skull-view .c2-r-leak .c2-r-line b{ font-size:22px; }
     #skull-view .c2-drawer{ left:10px;right:10px;top:118px;bottom:28px;width:auto;max-width:none; }
     #skull-view .c2-fig-v{ font-size:34px; }
     #skull-view .c2-figs{ grid-template-columns:repeat(2,minmax(0,1fr));gap:0 16px; }
@@ -5200,7 +5206,8 @@
           <p class="c2-p" id="c2-p1">The leaked records, as far as they name a place. Nothing is modelled on this map.</p>
         </div>
         <div class="c2-map" id="c2-map1-wrap" data-kind="located"><div class="c2-canvas" id="c2-map1"></div></div>
-        <p class="c2-note">Yellow: home settlement of the dead. Red: place of death in Ukraine. Both come from the Rosstat leak as mapped by iStories. Draw a shape on the map to count the deaths inside it.</p>
+        <p class="c2-note">Yellow: home settlement of the dead. Red: place of death in Ukraine. Both come from the Rosstat leak as mapped by iStories. Draw a shape on the map to count the deaths inside it: the panel shows the estimate for the area on top (records plus modelled points) and the leak’s own records below.</p>
+        <div class="c2-years" data-c2-years></div>
       </section>
 
       <section class="c2-sec" id="c2-sec2" aria-label="Map 2">
@@ -5211,6 +5218,7 @@
         </div>
         <div class="c2-map" id="c2-map2-wrap" data-kind="estimate"><div class="c2-canvas" id="c2-map2"></div></div>
         <p class="c2-note" id="c2-note2">Located points come from the Rosstat leak as mapped by iStories. The remainder up to ~720,000 is distributed by the density of the located data, so it shows where the deaths probably are, not who they were.</p>
+        <div class="c2-years" data-c2-years></div>
       </section>
 
       <section class="c2-sec ruled" id="c2-figs-sec" aria-label="Key figures">
@@ -16147,7 +16155,29 @@ function c2RenderAccs(){
     });
   }
 }
-function renderSkullBars(){ c2RenderAccs(); }
+/* registered war deaths by year of death, whole leak (not the drawn area): the place of death is missing for most 2022 acts, so an area cannot be split by year */
+const C2_YEARS = {
+  max: 182264,
+  rows: [
+    { name:'2022', value:18877, note:'Most of these name no place of death, so 2022 is thin on the maps.' },
+    { name:'2023', value:42365 },
+    { name:'2024', value:109683 },
+    { name:'2025', value:182264 },
+    { name:'2026, to 29 Sep', value:39296, cls:'alt', note:'Incomplete: the register ends on 29 September 2026 and the latest deaths are not registered yet. Do not read it as a fall in losses.' },
+  ],
+};
+function c2RenderYears(){
+  const hosts = document.querySelectorAll('[data-c2-years]');
+  if(!hosts.length) return;
+  const tot = C2_YEARS.rows.reduce((a, r) => a + r.value, 0);
+  const html = '<div class="c2-eyebrow">By year of death · the whole leak, not the area you draw</div>'
+    + '<div class="c2-bars">' + C2_YEARS.rows.map(r => c2Bar(r, { max: C2_YEARS.max })).join('') + '</div>'
+    + '<p class="c2-note">Registered war deaths by year of death. The five bars add up to ' + c2Fmt(tot) + ', close to Bloomberg’s ~392,700 and narrower than the broad counts further down the page; counts use different definitions, so do not mix them. '
+    + 'The maps cannot show a drawn area by year: most 2022 deaths name no place (87% of 2022 acts and 28% of 2023 acts, @M0nstas), so a by-year count for an area would mislead. '
+    + 'The yearly figures come from one secondary summary of the database (<a href="https://ahk1971.substack.com/p/russias-war-in-ukraine-may-have-cost" target="_blank" rel="noopener">Substack</a>) and were not independently checked here.</p>';
+  hosts.forEach(h => { h.innerHTML = html; });
+}
+function renderSkullBars(){ c2RenderAccs(); c2RenderYears(); }
 
 renderSkullStats();
 renderSkullBars();
@@ -16481,8 +16511,7 @@ const C2MAP = (function(){
     /* chrome */
     const touch = () => !!(window.matchMedia && window.matchMedia('(pointer:coarse)').matches);
     const mq = window.matchMedia ? window.matchMedia('(max-width:760px)') : { matches:false, addEventListener(){} };
-    const hintIdle = est ? 'Pick a shape and draw it on the map. The located deaths inside it are counted, and the estimate is shown on its own line.'
-                         : 'Pick a shape and draw it on the map. The deaths inside it are counted.';
+    const hintIdle = 'Pick a shape and draw it on the map. The panel shows the estimate for the area, and under it the records of the Rosstat leak.';
     const chrome = document.createElement('div');
     chrome.innerHTML =
       '<div class="c2-search"><div class="c2-panel c2-search-in">' + ICON.search + '<input type="search" autocomplete="off" aria-label="Search a city or village" placeholder="City or village (3+ letters)"></div><div class="c2-panel c2-res" role="listbox"></div></div>'
@@ -16717,25 +16746,36 @@ const C2MAP = (function(){
       const bb = bbox(ring);
       const lived = countIn(ring, bb, D.rLon, D.rLat, D.rC), died = countIn(ring, bb, D.pLon, D.pLat, D.pC);
       const area = ringArea(ring);
-      let html = '<div class="c2-r-top"><div><div class="c2-eyebrow">Selected area</div><div class="c2-r-area">About ' + areaText(area) + ' km²</div></div>'
-        + '<button type="button" class="c2-sq" data-act="clear" aria-label="Clear the area" style="border:1px solid #3a3936;border-radius:8px">' + ICON.x + '</button></div>'
-        + '<div class="c2-r-rows">'
-        + '<div class="c2-r-row"><span class="c2-dot" style="background:' + YEL + '"></span><div class="c2-r-main"><div class="c2-r-line"><span>Lived here</span><b>' + fmt(lived) + '</b></div>'
-        + '<div class="c2-r-sub">' + (lived ? 'Home settlements in the Rosstat leak (iStories)' : 'No settlement of residence inside this area') + '</div></div></div>'
-        + '<div class="c2-r-row"><span class="c2-dot" style="background:' + RED + '"></span><div class="c2-r-main"><div class="c2-r-line"><span>Died here</span><b>' + fmt(died) + '</b></div>'
-        + '<div class="c2-r-sub">' + (died ? 'Located deaths in the Rosstat leak (iStories)' : 'No located place of death inside this area') + '</div></div></div>'
-        + '</div>';
-      if(est && S.M){
-        const ml = countIn(ring, bb, S.M.res.lon, S.M.res.lat, S.M.res.c), md = countIn(ring, bb, S.M.death.lon, S.M.death.lat, S.M.death.c);
-        html += '<div class="c2-r-model"><div class="c2-r-sub">Added by the estimate. Modelled up to ~' + fmt(SKULL_DATA.leakEstimate.value) + ', not records of individual places.</div>'
-          + '<div class="c2-r-est"><span>Lived here</span><b>' + (ml ? approx(ml) : '0') + '</b></div>'
-          + '<div class="c2-r-est"><span>Died here</span><b>' + (md ? approx(md) : '0') + '</b></div></div>';
+      /* the modelled points are counted on both maps (Map 1 only draws the records, but its panel gives the same estimate as Map 2) */
+      let ml = null, md = null;
+      if(S.M){
+        ml = countIn(ring, bb, S.M.res.lon, S.M.res.lat, S.M.res.c); md = countIn(ring, bb, S.M.death.lon, S.M.death.lat, S.M.death.c);
+      } else if(!S.mState){
+        S.mState = 'loading';
+        loadModel().then(m => { S.M = m; S.mState = 'ok'; if(S.ring) result(); }).catch(() => { S.mState = 'fail'; if(S.ring) result(); });
       }
+      const total = (real, mod) => mod == null ? (S.mState === 'fail' ? 'n/a' : '…') : (mod ? approx(real + mod) : fmt(real));
+      const estSub = (real, mod, none) => mod == null ? (S.mState === 'fail' ? 'The estimate could not be loaded' : 'Loading the estimate…')
+        : (real + mod ? fmt(real) + ' records + ' + (mod ? approx(mod) : '0') + ' modelled' : none);
+      const row = (col, label, val, sub) => '<div class="c2-r-row"><span class="c2-dot" style="background:' + col + '"></span><div class="c2-r-main"><div class="c2-r-line"><span>' + label + '</span><b>' + val + '</b></div>'
+        + '<div class="c2-r-sub">' + sub + '</div></div></div>';
+      const html = '<div class="c2-r-top"><div><div class="c2-eyebrow">Selected area</div><div class="c2-r-area">About ' + areaText(area) + ' km²</div></div>'
+        + '<button type="button" class="c2-sq" data-act="clear" aria-label="Clear the area" style="border:1px solid #3a3936;border-radius:8px">' + ICON.x + '</button></div>'
+        + '<div class="c2-r-block c2-r-estb"><div class="c2-r-cap">Estimate<small>up to ~' + fmt(SKULL_DATA.leakEstimate.value) + ' · records + modelled</small></div>'
+        + '<div class="c2-r-rows">'
+        + row(YEL, 'Lived here', total(lived, ml), estSub(lived, ml, 'No settlement of residence inside this area'))
+        + row(RED, 'Died here', total(died, md), estSub(died, md, 'No place of death inside this area'))
+        + '</div><div class="c2-r-sub">The modelled share is spread in proportion to the located data. It is not records of individual places.</div></div>'
+        + '<div class="c2-r-block c2-r-leak"><div class="c2-r-cap">Rosstat leak<small>real records, located by iStories</small></div>'
+        + '<div class="c2-r-rows">'
+        + row(YEL, 'Lived here', fmt(lived), lived ? 'Home settlements named in the leak' : 'No settlement of residence inside this area')
+        + row(RED, 'Died here', fmt(died), died ? 'Located places of death named in the leak' : 'No located place of death inside this area')
+        + '</div></div>';
       resEl.innerHTML = html;
       const first = !resEl.classList.contains('on');
       resEl.classList.add('on'); wrap.classList.add('has-result');
       if(first && resEl.classList.contains('c2-out') && resEl.scrollIntoView) resEl.scrollIntoView({ block:'nearest', behavior:'smooth' });
-      S.last_result = { lived, died, area };
+      S.last_result = { lived, died, area, mLived: ml, mDied: md, estLived: ml == null ? null : lived + ml, estDied: md == null ? null : died + md };
     }
 
     /* ----- list drawer ----- */
@@ -16793,8 +16833,8 @@ const C2MAP = (function(){
         + '<h3>About the map</h3>'
         + '<h4>What the circles are</h4><p>Yellow circles are the settlements where the dead lived, sized by the number of people. Red circles are the places of death in Ukraine, also sized by number. Both come from the leaked Rosstat death-certificate database, placed on the map by <a href="https://istories.media/war-map/regions/" target="_blank" rel="noopener">iStories</a>. The leak is unverified.</p>'
         + (est ? '<h4>The estimate</h4><p>This map adds points up to the estimate of about ' + fmt(SKULL_DATA.leakEstimate.value) + ' (Meduza and Mediazona, 23 November 2026). They are spread in proportion to the located data and drawn in the same colours. They are a model of where the deaths probably are, not records of individual places. The method is stored with the data.</p>'
-               : '<h4>Nothing is modelled here</h4><p>Map 1 shows only what the records name. The next map adds the modelled remainder of the estimate.</p>')
-        + '<h4>Counting in an area</h4><p>Draw a polygon, box or circle. “Lived here” counts home settlements, which the data holds for Russia only, so an area in Ukraine shows none. “Died here” counts the located places of death.' + (est ? ' The modelled points are counted on their own line.' : '') + '</p>'
+               : '<h4>Nothing is modelled here</h4><p>Map 1 draws only what the records name. The next map also draws the modelled remainder of the estimate. The area panel is the same on both maps: it adds the modelled points to the records so that the top figure is the estimate.</p>')
+        + '<h4>Counting in an area</h4><p>Draw a polygon, box or circle. The top block is the estimate for the area (located records plus modelled points, scaled to about ' + fmt(SKULL_DATA.leakEstimate.value) + '). The bottom block is only what the Rosstat leak names. “Lived here” counts home settlements, which the data holds for Russia only, so an area in Ukraine shows none. “Died here” counts the located places of death.</p>'
         + '<h4>Limits</h4><p>The latest months are incomplete because deaths are registered with a lag.' + (hid ? ' The source marks ' + fmt(hid.n) + ' deaths at ' + fmt(hid.places) + ' places as hidden, so they are not on the map.' : '') + ' Deaths registered without a named place are not on the map.</p>'
         + '<h4>Data and credit</h4><p>Data: iStories (Rosstat leak). Base maps: OpenFreeMap, OpenMapTiles and OpenStreetMap contributors; satellite imagery © Esri, Maxar, Earthstar Geographics.</p>';
       q('.c2-about').classList.add('on');
@@ -27305,7 +27345,7 @@ function fsClose(){
 <script>
 /* PWA-v2: servis işçisi — yalnızca http(s) üzerinde (file:// ve DOWNLOAD SITE kopyasında devre dışı) */
 (function(){
-  var BUILD = '20261126-1830';
+  var BUILD = '20261126-1845';
   var live = ('serviceWorker' in navigator) && /^https?:$/.test(location.protocol);
   var reg = null, lastKick = 0;
   function ctl(){ return live ? navigator.serviceWorker.controller : null; }
