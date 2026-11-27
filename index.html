@@ -7132,7 +7132,19 @@ const FLink = (function(){
     return (b.type === t) ? b : new Blob([b], { type:t });
   }
 
-  return { parse, resolve, fetchImageBlob, extractCoords, titleFromText, isoLocal, snowflakeDate, platformLabel,
+  /* a video file (Telegram's CDN link of a public post): direct first, then the proxies; must start like an MP4/WebM */
+  async function fetchVideoBlob(url){
+    let b = null;
+    try { b = await direct(url, 'blob', { deadline: Date.now() + 60000, directMs: 60000 }); } catch(e){ b = null; }
+    if(!b) b = await proxied(url, 'blob', { deadline: Date.now() + 120000, proxyMs: 60000 });
+    let ok = false;
+    try { const h = new Uint8Array(await b.slice(0, 12).arrayBuffer()); const t = String.fromCharCode.apply(null, h.subarray(4, 8));
+      ok = t === 'ftyp' || (h[0] === 0x1a && h[1] === 0x45 && h[2] === 0xdf && h[3] === 0xa3); } catch(e){}
+    if(!ok) throw new Error('not a video file');
+    return b;
+  }
+
+  return { parse, resolve, fetchImageBlob, fetchVideoBlob, extractCoords, titleFromText, isoLocal, snowflakeDate, platformLabel,
            getJson, resolveThread:resolveXThread, tgPostLinks,
            proxies:{ get:getProxies, set:setProxies, defaults:DEFAULT_PROXIES },
            _t:{ fromFx, fromVx, fxPart, parseTelegramHtml, parseOg } };
@@ -24490,6 +24502,19 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
           val = u2; out.hosted = (out.hosted || 0) + 1;
         } catch(e){ out.hostErr = (e && e.message) || 'error'; }
       }
+      /* not on Catbox: copy Telegram's (expiring) CDN video into the GitHub data repository */
+      if(m.kind === 'video' && res.platform === 'telegram' && val === m.url && /telesco\.pe|cdn-?telegram|telegram-cdn/i.test(m.url) && FPub.hasToken()){
+        edLinkStatus('Downloading the video from Telegram…', 'busy');
+        try {
+          const vb = await FLink.fetchVideoBlob(m.url);
+          if(vb.size > 95 * 1048576) throw new Error('too large for GitHub (' + Math.round(vb.size / 1048576) + ' MB)');
+          const pm = /t\.me\/(?:s\/)?([A-Za-z0-9_]+)\/(\d+)/.exec(res.canonical || res.url || '');
+          const name = 'media/tg/link-' + (pm ? pm[1] + '-' + pm[2] : String(Date.now())) + '-' + n + '.' + (/webm/i.test(vb.type) ? 'webm' : 'mp4');
+          edLinkStatus('Uploading the video to GitHub (' + (vb.size / 1048576).toFixed(1) + ' MB)…', 'busy');
+          val = await FPub.putMedia(name, vb, 'Telegram link video ' + (pm ? pm[1] + '/' + pm[2] : '') + ' — editor upload');
+          out.github = (out.github || 0) + 1;
+        } catch(e){ out.ghErr = (e && e.message) || 'error'; }
+      }
       let hostedImg = null;
       if(m.kind === 'image' && !stable && res.platform === 'telegram' && FHost.enabled() && !hostDown){
         edLinkStatus('Uploading image ' + n + '/' + items.length + ' to Catbox…', 'busy');
@@ -24515,6 +24540,7 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
     }
     const tgPublic = res.platform === 'telegram' && res.canonical && !/\/c\//.test(res.canonical) && /^https:\/\/t\.me\//.test(res.canonical);
     if(poster && !hasVideoFile && tgPublic){
+      out.noVideoFile = true;
       /* video dosyası alınamadı: küçük bir kapak kopyası + "Telegram'da aç" kartı */
       let pv = poster.url;
       if(embedOn){
@@ -24547,6 +24573,8 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
       const bits = [];
       if(mi.hosted) bits.push(mi.hosted + ' video' + (mi.hosted > 1 ? 's' : '') + ' copied to Catbox');
       if(mi.github) bits.push(mi.github + ' video' + (mi.github > 1 ? 's' : '') + ' copied to your GitHub data repository — the site plays it from there');
+      if(mi.ghErr) bits.push('GitHub copy of the video failed (' + edEsc(mi.ghErr) + ') — kept Telegram\'s own link, which may expire');
+      if(mi.noVideoFile) bits.push('tip: Telegram shows no video file for this post on the web; forward the post itself (not its link) to your bot and videos up to 20 MB come through');
       if(mi.hostedImg) bits.push(mi.hostedImg + ' image' + (mi.hostedImg > 1 ? 's' : '') + ' copied to Catbox — the site uses the Catbox link');
       if(mi.imgHostErr) bits.push('Catbox image copy failed (' + edEsc(mi.imgHostErr) + ') — used the usual handling (small embedded copy or the original link)');
       if(mi.hostErr) bits.push('Catbox copy failed (' + edEsc(mi.hostErr) + ') — kept Telegram\'s own link, which may expire');
@@ -25193,6 +25221,7 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
         const m3 = await edAddResolvedMedia(r3);
         mi.added += m3.added; mi.saved += m3.saved; mi.videos += m3.videos; mi.embedCard = m3.embedCard; mi.poster = m3.poster;
         mi.hosted = (mi.hosted || 0) + (m3.hosted || 0); if(m3.hostErr) mi.hostErr = m3.hostErr;
+        mi.github = (mi.github || 0) + (m3.github || 0); if(m3.ghErr) mi.ghErr = m3.ghErr; if(m3.noVideoFile) mi.noVideoFile = true;
         mi.hostedImg = (mi.hostedImg || 0) + (m3.hostedImg || 0); if(m3.imgHostErr) mi.imgHostErr = m3.imgHostErr;
         if(m3.added) res.notes.push('Media taken from the public post link instead.');
       }
@@ -25201,6 +25230,7 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
       const m4 = await edAddResolvedMedia(res);
       mi.added += m4.added; mi.saved += m4.saved; mi.failed += m4.failed; mi.videos += m4.videos;
       mi.hosted = (mi.hosted || 0) + (m4.hosted || 0); if(m4.hostErr) mi.hostErr = m4.hostErr;
+      mi.github = (mi.github || 0) + (m4.github || 0); if(m4.ghErr) mi.ghErr = m4.ghErr; if(m4.noVideoFile) mi.noVideoFile = true;
       mi.hostedImg = (mi.hostedImg || 0) + (m4.hostedImg || 0); if(m4.imgHostErr) mi.imgHostErr = m4.imgHostErr;
     }
     /* video dosyası siteye girmediyse (büyük / indirilemedi) Telegram'ın kendi kapak görselini al */
@@ -27663,7 +27693,7 @@ function fsClose(){
 <script>
 /* PWA-v2: servis işçisi — yalnızca http(s) üzerinde (file:// ve DOWNLOAD SITE kopyasında devre dışı) */
 (function(){
-  var BUILD = '20261127-0610';
+  var BUILD = '20261127-0640';
   var live = ('serviceWorker' in navigator) && /^https?:$/.test(location.protocol);
   var reg = null, lastKick = 0;
   function ctl(){ return live ? navigator.serviceWorker.controller : null; }
