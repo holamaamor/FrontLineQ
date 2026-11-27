@@ -9577,7 +9577,22 @@ const FPub = (()=>{
     setTimeout(wait, 8000);
   }
   startAuto();
-  return { load, set, hasToken, dirty, designDirty, publish, test, userHash, endpoint, _t:{ toB64, payload } };
+  /* a media file (video from the Telegram inbox) into the data repository; returns its public raw URL.
+     Only for files Telegram let the bot download (≤ 20 MB); GitHub's limit is 100 MB. */
+  async function putMedia(path, blob, msg){
+    const c = load();
+    if(!c.token) throw new Error('no GitHub token');
+    const bytes = new Uint8Array(await blob.arrayBuffer()); let bin = ''; const CH = 0x8000;
+    for(let i = 0; i < bytes.length; i += CH) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+    const s = await shaOf(c, path);
+    if(s.error) throw new Error(explain(s.error));
+    const body = { message: msg, content: btoa(bin), branch: c.branch };
+    if(s.sha) body.sha = s.sha;
+    const p = await api('PUT', fileUrl(c, path), c.token, body);
+    if(!p.ok) throw new Error(explain(p));
+    return 'https://raw.githubusercontent.com/' + c.repo.replace(/^\/+|\/+$/g, '') + '/' + encodeURIComponent(c.branch) + '/' + enc(path);
+  }
+  return { load, set, hasToken, dirty, designDirty, publish, test, userHash, endpoint, putMedia, _t:{ toB64, payload } };
 })();
 
 /* PUBLISH paneli (editörden açılır) */
@@ -24531,6 +24546,7 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
     if(mi){
       const bits = [];
       if(mi.hosted) bits.push(mi.hosted + ' video' + (mi.hosted > 1 ? 's' : '') + ' copied to Catbox');
+      if(mi.github) bits.push(mi.github + ' video' + (mi.github > 1 ? 's' : '') + ' copied to your GitHub data repository — the site plays it from there');
       if(mi.hostedImg) bits.push(mi.hostedImg + ' image' + (mi.hostedImg > 1 ? 's' : '') + ' copied to Catbox — the site uses the Catbox link');
       if(mi.imgHostErr) bits.push('Catbox image copy failed (' + edEsc(mi.imgHostErr) + ') — used the usual handling (small embedded copy or the original link)');
       if(mi.hostErr) bits.push('Catbox copy failed (' + edEsc(mi.hostErr) + ') — kept Telegram\'s own link, which may expire');
@@ -25140,7 +25156,26 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
       } else if(FHost.enabled() && d.forwarded && !d.link){
         res.notes.push('This video comes from a private channel, so it was not copied to Catbox (it would become a public link). Tick the private-channel option in "video hosting" if you want that.');
       }
-      if(v.size && v.size > 3 * 1048576){ bigVideo = true; res.notes.push('A ' + (v.size / 1048576).toFixed(1) + ' MB video is too large to embed in the site file.'); continue; }
+      /* the GitHub data repository (same token as PUBLISH): videos too big to embed go to media/tg/ and the site plays them from there */
+      if(v.size > 3 * 1048576 && v.size <= 20 * 1048576 && FPub.hasToken()){
+        if(!d.forwarded || d.link || FHost.privateOk()){
+          try {
+            edLinkStatus('Downloading video ' + (i + 1) + '/' + d.videos.length + ' from Telegram (' + (v.size / 1048576).toFixed(1) + ' MB)…', 'busy');
+            const vb = await FTg.fileBlob(v.id);
+            const ext = /quicktime/i.test(v.mime || vb.type) ? 'mov' : /webm/i.test(v.mime || vb.type) ? 'webm' : 'mp4';
+            edLinkStatus('Uploading video ' + (i + 1) + '/' + d.videos.length + ' to GitHub (' + (vb.size / 1048576).toFixed(1) + ' MB)…', 'busy');
+            const vurl = await FPub.putMedia('media/tg/' + String(d.id).replace(/[^A-Za-z0-9_-]/g, '') + '-' + (i + 1) + '.' + ext, vb, 'Telegram inbox video ' + d.id + ' — editor upload');
+            edMedia.push(vurl); mi.added++; mi.videos++; mi.github = (mi.github || 0) + 1;
+            continue;
+          } catch(e){ res.notes.push('GitHub copy of the video failed (' + ((e && e.message) || 'error') + ').'); }
+        } else res.notes.push('This video comes from a private channel, so it was not copied to GitHub (it would become a public link). Tick the private-channel option in "video & photo hosting" if you want that.');
+      }
+      if(v.size && v.size > 3 * 1048576){
+        bigVideo = true;
+        res.notes.push('A ' + (v.size / 1048576).toFixed(1) + ' MB video is too large to embed in the site file.'
+          + (v.size > 20 * 1048576 ? ' Telegram does not let a bot download files over 20 MB.' : !FPub.hasToken() ? ' Add your GitHub token in PUBLISH and videos up to 20 MB are copied to your data repository instead.' : ''));
+        continue;
+      }
       edLinkStatus('Downloading video ' + (i + 1) + '/' + d.videos.length + '…', 'busy');
       try {
         const blob = await FTg.fileBlob(v.id);
@@ -27628,7 +27663,7 @@ function fsClose(){
 <script>
 /* PWA-v2: servis işçisi — yalnızca http(s) üzerinde (file:// ve DOWNLOAD SITE kopyasında devre dışı) */
 (function(){
-  var BUILD = '20261127-0240';
+  var BUILD = '20261127-0610';
   var live = ('serviceWorker' in navigator) && /^https?:$/.test(location.protocol);
   var reg = null, lastKick = 0;
   function ctl(){ return live ? navigator.serviceWorker.controller : null; }
