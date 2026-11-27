@@ -7608,10 +7608,10 @@ const FTg = (function(){
         photos.push({ id:best.file_id, size:best.file_size || 0 });
       }
       const vd = m.video || m.animation || m.video_note;
-      if(vd) videos.push({ id:vd.file_id, size:vd.file_size || 0, mime:vd.mime_type || 'video/mp4', thumb:(vd.thumbnail || vd.thumb || {}).file_id || '' });
+      if(vd) videos.push({ id:vd.file_id, size:vd.file_size || 0, mime:vd.mime_type || 'video/mp4', thumb:(vd.thumbnail || vd.thumb || {}).file_id || '', msg:m.message_id || 0 });
       if(m.document && m.document.mime_type){
         if(/^image\//.test(m.document.mime_type)) photos.push({ id:m.document.file_id, size:m.document.file_size || 0 });
-        else if(/^video\//.test(m.document.mime_type)) videos.push({ id:m.document.file_id, size:m.document.file_size || 0, mime:m.document.mime_type });
+        else if(/^video\//.test(m.document.mime_type)) videos.push({ id:m.document.file_id, size:m.document.file_size || 0, mime:m.document.mime_type, msg:m.message_id || 0 });
       }
     });
     const fwd = msgs.map(fwdInfo).find(Boolean) || null;
@@ -9604,7 +9604,25 @@ const FPub = (()=>{
     if(!p.ok) throw new Error(explain(p));
     return 'https://raw.githubusercontent.com/' + c.repo.replace(/^\/+|\/+$/g, '') + '/' + encodeURIComponent(c.branch) + '/' + enc(path);
   }
-  return { load, set, hasToken, dirty, designDirty, publish, test, userHash, endpoint, putMedia, _t:{ toB64, payload } };
+  function rawUrl(path){ const c = load(); return 'https://raw.githubusercontent.com/' + c.repo.replace(/^\/+|\/+$/g, '') + '/' + encodeURIComponent(c.branch) + '/' + enc(path); }
+  /* start a GitHub Actions workflow of the data repository (tg-video.yml: Telegram videos over 20 MB) */
+  async function dispatch(workflow, inputs){
+    const c = load();
+    if(!c.token) throw new Error('no GitHub token');
+    const r = await api('POST', repoUrl(c) + '/actions/workflows/' + encodeURIComponent(workflow) + '/dispatches', c.token, { ref: c.branch, inputs });
+    if(r.status === 204 || r.ok) return true;
+    if(r.status === 403) throw new Error('the GitHub token needs the "Actions: Read and write" permission');
+    if(r.status === 404) throw new Error('workflow ' + workflow + ' not found in ' + c.repo + ' (or the token cannot see Actions)');
+    throw new Error(explain(r));
+  }
+  /* the newest run of a workflow: { status, conclusion, url } */
+  async function lastRun(workflow){
+    const c = load();
+    const r = await api('GET', repoUrl(c) + '/actions/workflows/' + encodeURIComponent(workflow) + '/runs?per_page=1&event=workflow_dispatch', c.token);
+    const w = r.ok && r.json && r.json.workflow_runs && r.json.workflow_runs[0];
+    return w ? { status: w.status, conclusion: w.conclusion, url: w.html_url, created: w.created_at } : null;
+  }
+  return { load, set, hasToken, dirty, designDirty, publish, test, userHash, endpoint, putMedia, rawUrl, dispatch, lastRun, _t:{ toB64, payload } };
 })();
 
 /* PUBLISH paneli (editörden açılır) */
@@ -24573,6 +24591,7 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
       const bits = [];
       if(mi.hosted) bits.push(mi.hosted + ' video' + (mi.hosted > 1 ? 's' : '') + ' copied to Catbox');
       if(mi.github) bits.push(mi.github + ' video' + (mi.github > 1 ? 's' : '') + ' copied to your GitHub data repository — the site plays it from there');
+      if(mi.ghLater) bits.push(mi.ghLater + ' big video' + (mi.ghLater > 1 ? 's are' : ' is') + ' being copied by a GitHub job — it plays on the site in a few minutes (a message appears here when it is ready)');
       if(mi.ghErr) bits.push('GitHub copy of the video failed (' + edEsc(mi.ghErr) + ') — kept Telegram\'s own link, which may expire');
       if(mi.noVideoFile) bits.push('tip: Telegram shows no video file for this post on the web; forward the post itself (not its link) to your bot and videos up to 20 MB come through');
       if(mi.hostedImg) bits.push(mi.hostedImg + ' image' + (mi.hostedImg > 1 ? 's' : '') + ' copied to Catbox — the site uses the Catbox link');
@@ -25006,6 +25025,26 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
   });
 
   /* ---------------- Telegram gelen kutusu ---------------- */
+  /* follow a GitHub job that copies a big video: toast when the file is on GitHub, or when the job failed */
+  function edTgWatch(path, t0){
+    const url = FPub.rawUrl(path);
+    let n = 0;
+    const tick = async ()=>{
+      n++;
+      try {
+        const r = await fetch(url + '?t=' + Date.now(), { method:'HEAD', cache:'no-store' });
+        if(r.ok){ toast('Big Telegram video is ready on GitHub ✓'); return; }
+      } catch(e){}
+      try {
+        const run = await FPub.lastRun('tg-video.yml');
+        if(run && run.status === 'completed' && run.conclusion !== 'success' && Date.parse(run.created) >= t0 - 60000){
+          toast('The GitHub job for the big video failed — open it on GitHub to see why: ' + run.url, 12000); return;
+        }
+      } catch(e){}
+      if(n < 40) setTimeout(tick, 30000);
+    };
+    setTimeout(tick, 60000);
+  }
   function edTgSay(html, cls){
     edTgState = html ? { html, cls:cls || '' } : null;
     const el = document.getElementById('ed-tg-status');
@@ -25198,10 +25237,22 @@ document.querySelectorAll('.top-tab').forEach(tab=>{
           } catch(e){ res.notes.push('GitHub copy of the video failed (' + ((e && e.message) || 'error') + ').'); }
         } else res.notes.push('This video comes from a private channel, so it was not copied to GitHub (it would become a public link). Tick the private-channel option in "video & photo hosting" if you want that.');
       }
+      /* over 20 MB: the bot API cannot download it — a GitHub Actions job does (MTProto, up to 2 GB), see tg-video.yml */
+      const vmsg = v.msg || (!d.group && /^tg-(\d+)-/.test(d.id) ? +d.id.split('-')[1] : 0);
+      if(v.size > 20 * 1048576 && FPub.hasToken() && vmsg && (!d.forwarded || d.link || FHost.privateOk())){
+        const out = 'media/tg/' + String(d.id).replace(/[^A-Za-z0-9_-]/g, '') + '-' + (i + 1) + '.mp4';
+        try {
+          edLinkStatus('Starting the GitHub job for the ' + (v.size / 1048576).toFixed(0) + ' MB video…', 'busy');
+          await FPub.dispatch('tg-video.yml', { message_id: String(vmsg), out });
+          edMedia.push(FPub.rawUrl(out)); mi.added++; mi.videos++; mi.ghLater = (mi.ghLater || 0) + 1;
+          edTgWatch(out, Date.now());
+          continue;
+        } catch(e){ res.notes.push('Could not start the GitHub job for the big video (' + ((e && e.message) || 'error') + ').'); }
+      }
       if(v.size && v.size > 3 * 1048576){
         bigVideo = true;
         res.notes.push('A ' + (v.size / 1048576).toFixed(1) + ' MB video is too large to embed in the site file.'
-          + (v.size > 20 * 1048576 ? ' Telegram does not let a bot download files over 20 MB.' : !FPub.hasToken() ? ' Add your GitHub token in PUBLISH and videos up to 20 MB are copied to your data repository instead.' : ''));
+          + (v.size > 20 * 1048576 ? ' Telegram does not let a bot download files over 20 MB' + (FPub.hasToken() ? '.' : ' — add your GitHub token in PUBLISH and the GitHub job copies it.') : !FPub.hasToken() ? ' Add your GitHub token in PUBLISH and videos up to 20 MB are copied to your data repository instead.' : ''));
         continue;
       }
       edLinkStatus('Downloading video ' + (i + 1) + '/' + d.videos.length + '…', 'busy');
@@ -27693,7 +27744,7 @@ function fsClose(){
 <script>
 /* PWA-v2: servis işçisi — yalnızca http(s) üzerinde (file:// ve DOWNLOAD SITE kopyasında devre dışı) */
 (function(){
-  var BUILD = '20261127-0640';
+  var BUILD = '20261127-0715';
   var live = ('serviceWorker' in navigator) && /^https?:$/.test(location.protocol);
   var reg = null, lastKick = 0;
   function ctl(){ return live ? navigator.serviceWorker.controller : null; }
